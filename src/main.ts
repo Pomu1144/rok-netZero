@@ -400,6 +400,10 @@ const hud = new Hud(ctx, {
   raidClick: () => openHospital(ctx),
   profile: () => openProfile(ctx),
   home: () => world.goHome(),
+  kingdom: () => {
+    sfx.brush();
+    world.toggleKingdom();
+  },
 });
 
 const tutorial = new Tutorial(game, {

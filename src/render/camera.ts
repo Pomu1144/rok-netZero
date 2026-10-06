@@ -46,6 +46,12 @@ export class Camera {
     return { x: (wx - this.x) * this.zoom + this.width / 2, y: (wy - this.y) * this.zoom + this.height / 2 };
   }
 
+  /** Ease to a zoom level around the centre of the screen. */
+  zoomTo(z: number): void {
+    this.zoomAnchor = { x: this.width / 2, y: this.height / 2 };
+    this.targetZoom = Math.max(this.minZoom, Math.min(this.maxZoom, z));
+  }
+
   centerOn(x: number, y: number, animate = false): void {
     if (animate) {
       this.flyTo = { x, y, t0: performance.now(), fx: this.x, fy: this.y };

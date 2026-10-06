@@ -12,7 +12,7 @@ const NAMES = [
   // ink kit (sumi-e brushwork)
   'ink/wall_seg', 'ink/ink_mist', 'ink/ink_enso_c', 'ink/ink_enso_gold', 'ink/seal_solid', 'ink/seal_frame',
   'ink/ink_splat_red', 'ink/ink_blot', 'ink/fx_smoke', 'ink/fx_dust', 'ink/fx_leaf', 'ink/birds',
-  'ink/i_hammer', 'ink/i_lock', 'ink/i_swords', 'ink/i_spear', 'ink/i_gather',
+  'ink/i_hammer', 'ink/i_lock', 'ink/i_swords', 'ink/i_spear', 'ink/i_gather', 'ink/kingdom_map',
 ] as const;
 
 export type AssetName = (typeof NAMES)[number];

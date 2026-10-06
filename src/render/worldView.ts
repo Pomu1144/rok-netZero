@@ -1,4 +1,5 @@
 import { img } from '../assets';
+import { drawKingdom, drawLegend, kingdomBlend } from './kingdomMap';
 import { troopIdSprite } from '../data/troops';
 import { COMMANDER_BY_ID } from '../data/commanders';
 import type { Game } from '../game/game';
@@ -31,7 +32,7 @@ export class WorldView {
     this.ctx = canvas.getContext('2d')!;
     this.camera = new Camera(canvas, (x, y) => this.tap(x, y), (x, y) => this.hover(x, y));
     this.camera.zoom = 0.8;
-    this.camera.minZoom = 0.18;
+    this.camera.minZoom = 0.05;
     this.camera.maxZoom = 1.6;
     this.camera.bounds = { minX: 0, minY: 0, maxX: WORLD_SIZE * T, maxY: WORLD_SIZE * T };
     this.goHome(false);
@@ -69,9 +70,48 @@ export class WorldView {
     return best?.id ?? null;
   }
 
+  private legendAt = { x: 12, y: 0, ok: true, at: -1e9 };
+  /** Bottom-left corner clear of the side rail and the world tools (re-measured twice a second). */
+  private legendSpot(): { x: number; y: number } | null {
+    if (this.time - this.legendAt.at > 500) {
+      const box = this.canvas.getBoundingClientRect();
+      const rail = document.querySelector('.rail')?.getBoundingClientRect();
+      const tools = document.querySelector('.world-tools')?.getBoundingClientRect();
+      const vertical = !!rail && rail.height > rail.width;
+      const x = (vertical && rail ? rail.right : box.left) - box.left + 12;
+      let y = box.height - 12;
+      if (tools && tools.height > 0) y = Math.min(y, tools.top - box.top - 10);
+      if (rail && !vertical) y = Math.min(y, rail.top - box.top - 10);
+      this.legendAt = { x, y, ok: y > 330, at: this.time };
+    }
+    return this.legendAt.ok ? this.legendAt : null;
+  }
+
+  /** Far out, the realm is a map: a tap dives back in to that spot. */
+  get kingdomMode(): boolean {
+    return kingdomBlend(this.camera.zoom) > 0.5;
+  }
+
+  /** Zoom out to the whole kingdom, or back in to where the map is centred. */
+  toggleKingdom(): void {
+    const cam = this.camera;
+    if (this.kingdomMode) {
+      cam.zoomTo(0.8);
+    } else {
+      cam.centerOn((WORLD_SIZE * T) / 2, (WORLD_SIZE * T) / 2, true);
+      cam.zoomTo(Math.max(cam.minZoom, (Math.min(cam.width, cam.height) / (WORLD_SIZE * T)) * 0.95));
+    }
+  }
+
   private tap(sx: number, sy: number): void {
-    const id = this.objAt(sx, sy);
     const w = this.camera.toWorld(sx, sy);
+    if (this.kingdomMode) {
+      this.camera.centerOn(w.x, w.y, true);
+      this.camera.zoomTo(0.8);
+      this.onSelect(null, { x: Math.floor(w.x / T), y: Math.floor(w.y / T) });
+      return;
+    }
+    const id = this.objAt(sx, sy);
     this.selectedId = id;
     this.onSelect(id, { x: Math.floor(w.x / T), y: Math.floor(w.y / T) });
   }
@@ -253,7 +293,14 @@ export class WorldView {
 
     this.fx.drawBack(ctx);
     this.fx.draw(ctx, cam.zoom);
-    this.drawMist(ctx, dt, dpr);
+    const k = kingdomBlend(cam.zoom);
+    if (k < 1) this.drawMist(ctx, dt, dpr);
+    if (k > 0) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawKingdom(ctx, cam, s, k, this.time, T);
+      const spot = this.legendSpot();
+      if (spot) drawLegend(ctx, spot.x, spot.y, k);
+    }
   }
 
   /** A clash of arms at a world tile: crossed swords strike, red ink flies, a seal is stamped. */

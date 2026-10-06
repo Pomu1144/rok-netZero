@@ -34,7 +34,7 @@ Legend: `[x]` done · `[ ]` to do · **(you)** needs the owner (accounts, signin
 - [x] AI alliance: help speedups, gifts, alliance chat flavour
 - [x] Barbarian hunt event with leaderboard against AI governors
 - [x] Campaign mode: twelve story stages with hand-built enemy armies
-- [ ] Kingdom map zoom-out view with strategic icons
+- [x] Kingdom map zoom-out view with strategic icons
 
 ## Phase 4: polish and compliance
 

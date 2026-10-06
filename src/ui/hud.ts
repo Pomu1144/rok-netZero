@@ -28,6 +28,7 @@ export interface HudHandlers {
   raidClick: () => void;
   profile: () => void;
   home: () => void;
+  kingdom: () => void;
 }
 
 const NAV: [string, InkIcon, string][] = [
@@ -110,6 +111,7 @@ export class Hud {
       if (t.closest('[data-part=raid]')) return this.h.raidClick();
       if (t.closest('[data-part=gov]')) return this.h.profile();
       if (t.closest('[data-home]')) return this.h.home();
+      if (t.closest('[data-kingdom]')) return this.h.kingdom();
       if (t.closest('[data-res]')) return this.h.openNav('bag');
     });
   }
@@ -247,7 +249,7 @@ export class Hud {
     }
     this.parts.worldtools.classList.toggle('hidden', this.view !== 'world');
     if (this.view === 'world' && worldCoords) {
-      this.set('worldtools', `<button class="btn btn-sm" data-home="1">${ink('i_castle', 15)} Home</button><span class="coords">X ${worldCoords.x} · Y ${worldCoords.y}</span>`);
+      this.set('worldtools', `<button class="btn btn-sm" data-home="1">${ink('i_castle', 15)} Home</button><button class="btn btn-sm" data-kingdom="1">${ink('i_map', 15)} Kingdom</button><span class="coords">X ${worldCoords.x} · Y ${worldCoords.y}</span>`);
     }
   }
 

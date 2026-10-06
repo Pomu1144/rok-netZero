@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#0f1626" />
+    <title>Realm of Kings</title>
+    <link rel="icon" href="./assets/city_hall.webp" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="city-canvas"></canvas>
+      <canvas id="world-canvas" class="hidden"></canvas>
+      <div id="hud"></div>
+      <div id="ring" class="hidden"></div>
+      <div id="world-popup" class="hidden"></div>
+      <div id="modal-root"></div>
+      <div id="toasts"></div>
+      <div id="transition"></div>
+      <div id="title-screen">
+        <div class="title-bg"></div>
+        <div class="title-vignette"></div>
+        <div class="title-content">
+          <div class="logo">
+            <div class="logo-small">Chronicles of the</div>
+            <div class="logo-main">REALM OF KINGS</div>
+            <div class="logo-sub">Build · Conquer · Rule</div>
+          </div>
+          <div class="loader"><div class="loader-fill"></div></div>
+          <div class="loader-text">Summoning the realm…</div>
+          <button class="btn btn-gold btn-xl start-btn hidden">Enter the Realm</button>
+          <div class="title-foot">Art generated with Higgsfield AI · An original strategy game</div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

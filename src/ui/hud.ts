@@ -6,6 +6,7 @@ import { troopIdSprite } from '../data/troops';
 import { RES_KEYS } from '../data/types';
 import { FREE_FINISH_SECONDS, canAfford, cityHallLevel, findObj, objLabel, totalPower, upgradeInfo } from '../game/logic';
 import { achievementBadge } from '../game/achievements';
+import { huntBadge } from '../game/hunt';
 import { allianceBadge, canAskHelp } from '../game/alliance';
 import { dailyBadge, dayKey, loginClaimable } from '../game/daily';
 import { activeQuests, questDone } from '../game/quests';
@@ -79,6 +80,7 @@ export class Hud {
       el(`<div class="events" data-part="events">
         <button class="ev-btn" data-nav="calendar" aria-label="Login gifts"><img src="${assetUrl('ev_calendar')}" alt=""><span>Gifts</span><span class="badge hidden" data-badge="calendar"></span></button>
         <button class="ev-btn" data-nav="daily" aria-label="Daily duties"><img src="${assetUrl('ev_daily')}" alt=""><span>Duties</span><span class="badge hidden" data-badge="daily"></span></button>
+        <button class="ev-btn" data-nav="hunt" aria-label="Barbarian hunt"><img src="${assetUrl('ev_hunt')}" alt=""><span>Hunt</span><span class="badge hidden" data-badge="hunt"></span></button>
         <button class="ev-btn" data-nav="honours" aria-label="Hall of honours"><img src="${assetUrl('ev_honours')}" alt=""><span>Honours</span><span class="badge hidden" data-badge="honours"></span></button>
       </div>`),
     );
@@ -228,6 +230,7 @@ export class Hud {
     badge('calendar', loginClaimable(s, dayKey()) >= 0 ? 1 : 0);
     badge('daily', dailyBadge(s));
     badge('honours', achievementBadge(s));
+    badge('hunt', huntBadge(s));
     badge('alliance', s.alliance ? allianceBadge(s) : 0);
     badge('commanders', Object.values(s.commanders).some((c) => !c.unlocked && c.sculptures >= 10) ? 1 : 0);
 

@@ -39,6 +39,8 @@ import { openBuilding, openHospital, openResearch, openSpeedup, openTrain } from
 import { openCalendar, openDaily } from './ui/panels/daily';
 import { openAway, openHonours } from './ui/panels/honours';
 import { openAlliance } from './ui/panels/alliance';
+import { openHunt } from './ui/panels/hunt';
+import { rollHunt, seasonEnd } from './game/hunt';
 import { askHelp } from './game/alliance';
 import { awaySnapshot, awaySummary, awayWorthShowing, type AwaySummary } from './game/away';
 import { dayKey, loginClaimable, rollDaily } from './game/daily';
@@ -360,6 +362,7 @@ const hud = new Hud(ctx, {
     if (id === 'daily') openDaily(ctx);
     if (id === 'honours') openHonours(ctx);
     if (id === 'alliance') openAlliance(ctx);
+    if (id === 'hunt') openHunt(ctx);
   },
   openJob: (jobId) => openSpeedup(ctx, jobId),
   askHelp: (jobId) => {
@@ -549,7 +552,10 @@ async function boot(): Promise<void> {
       const before = awaySnapshot(game.state);
       const offline = game.catchUp();
       if (offline.length) refreshLiveModals();
-      game.act((s) => void rollDaily(s, dayKey()));
+      game.act((s) => {
+        rollDaily(s, dayKey());
+        rollHunt(s, Date.now());
+      });
       if (!game.state.tutorialDone) {
         setTimeout(() => openAdvisor(ctx, () => game.act((s) => void (s.tutorialDone = true))), 900);
       } else if (!tutorial.active) {
@@ -574,6 +580,7 @@ function welcomeBack(a: AwaySummary, capped: boolean): void {
 // the calendar can turn while the game is open
 setInterval(() => {
   if (game.state.daily && game.state.daily.day !== dayKey()) game.act((s) => void rollDaily(s, dayKey()));
+  if (game.state.hunt && Date.now() >= seasonEnd(game.state.hunt.season)) game.act((s) => void rollHunt(s, Date.now()));
 }, 30_000);
 
 /** Turn running timers into device reminders, converting game time to wall-clock time. */
@@ -613,7 +620,10 @@ onAppState(
     const away = Date.now() - pausedAt;
     pausedAt = 0;
     void clearReminders();
-    game.act((s) => void rollDaily(s, dayKey()));
+    game.act((s) => {
+      rollDaily(s, dayKey());
+      rollHunt(s, Date.now());
+    });
     if (away > 2000) {
       const before = awaySnapshot(game.state);
       const ev = game.resumeAfter(away);

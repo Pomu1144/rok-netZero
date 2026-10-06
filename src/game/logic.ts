@@ -42,6 +42,7 @@ import {
 import { RES_KEYS, addBonuses, type BonusKey, type Bonuses, type Cost, type ResKey, type TroopType } from '../data/types';
 import { talentBonuses } from './talents';
 import { allianceCheer, allianceTick } from './alliance';
+import { huntPointsFor } from './hunt';
 import { simulateBattle, troopPower, type BattleResult } from './battle';
 import { Rng } from './rng';
 import {
@@ -840,6 +841,7 @@ function resolveArrival(s: GameState, m: March, rng: Rng, events: GameEvent[]): 
     if (t.kind === 'barbarian' || t.kind === 'fort') {
       reward = barbarianReward(t.level, rng, t.kind === 'fort');
       grantReward(s, reward, m.commanderId);
+      s.stats.huntPoints = (s.stats.huntPoints ?? 0) + huntPointsFor(t.kind, t.level);
       if (t.kind === 'barbarian') {
         s.stats.barbsKilled++;
         s.stats.maxBarbLevel = Math.max(s.stats.maxBarbLevel, t.level);

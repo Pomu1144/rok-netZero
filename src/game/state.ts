@@ -5,6 +5,7 @@ import { PLOTS } from '../data/layout';
 import type { ResKey, TroopType } from '../data/types';
 import { generateWorld } from './world';
 import type { AllianceState } from './alliance';
+import type { HuntState } from './hunt';
 
 export type Troops = Record<string, number>;
 
@@ -162,6 +163,8 @@ export interface GameState {
     chestsOpened: number;
     /** alliance requests answered (optional for older saves) */
     allyHelps?: number;
+    /** lifetime barbarian-hunt points (see hunt.ts) */
+    huntPoints?: number;
   };
   tavern: { silverFreeAt: number; goldFreeAt: number };
   raid: Raid | null;
@@ -179,6 +182,8 @@ export interface GameState {
   login?: { claimed: number; last: string; cycles: number };
   /** honours: tiers claimed per achievement id (see achievements.ts) */
   achievements?: Record<string, number>;
+  /** current barbarian hunt season */
+  hunt?: HuntState;
   /** membership of the AI alliance (see alliance.ts) */
   alliance?: AllianceState;
   /** today's task baseline and opened activity chests */

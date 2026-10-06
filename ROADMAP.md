@@ -32,7 +32,7 @@ Legend: `[x]` done · `[ ]` to do · **(you)** needs the owner (accounts, signin
 - [x] Commander talent trees
 - [x] Battle scene: animated clash view with skill cut-ins
 - [x] AI alliance: help speedups, gifts, alliance chat flavour
-- [ ] Barbarian hunt event with leaderboard against AI governors
+- [x] Barbarian hunt event with leaderboard against AI governors
 - [ ] Campaign mode: twelve story stages with hand-built enemy armies
 - [ ] Kingdom map zoom-out view with strategic icons
 

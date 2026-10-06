@@ -31,6 +31,7 @@ import type { UiCtx } from './ui/ctx';
 import { $, anyModalOpen, closeAllModals, closeTopModal, flyTo, onAct, refreshLiveModals, setClock, toast, updateTimers } from './ui/dom';
 import { esc, fmt, fmtFull } from './ui/format';
 import { Hud } from './ui/hud';
+import { Tutorial } from './ui/tutorial';
 import { clearReminders, haptic, initStorage, nativeReady, onAppState, registerServiceWorker, scheduleReminders, setHaptics, type Reminder } from './native';
 import { BUILDING_KANJI, ink, type InkIcon } from './ui/ink';
 import { openCommander, openCommanders, openMarch, openTavern } from './ui/panels/army';
@@ -379,6 +380,25 @@ const hud = new Hud(ctx, {
   home: () => world.goHome(),
 });
 
+const tutorial = new Tutorial(game, {
+  plotPoint: (id) => {
+    const p = city.plotScreen(id);
+    return { x: p.x, y: p.y };
+  },
+  bubblePoint: (id) => city.bubbleScreen(id),
+  worldPoint: (id) => world.screenOf(id),
+  view: () => view,
+  ringPlot: () => ringPlot,
+  closeRing: () => closeRing(),
+  popupObj: () => popupObj,
+  modalOpen: () => anyModalOpen(),
+  focusPlot: (id) => city.focusPlot(id),
+  focusWorld: (id) => {
+    const o = game.state.world.find((x) => x.id === id);
+    if (o) world.goTo(o.x, o.y - 1);
+  },
+});
+
 // ---------------------------------------------------------------------------
 // game events -> feedback
 
@@ -458,6 +478,7 @@ function frame(now: number): void {
     world.render(dt);
     positionPopup();
   }
+  tutorial.update();
   uiTimer += dt;
   if (uiTimer > 200) {
     uiTimer = 0;

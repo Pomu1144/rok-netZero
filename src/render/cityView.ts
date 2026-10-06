@@ -162,6 +162,13 @@ export class CityView {
     return { x: c.x, y: c.y, top: t.y };
   }
 
+  /** Screen position of a plot's harvest/idle bubble, if one is showing. */
+  bubbleScreen(plotId: string): { x: number; y: number } | null {
+    const p = PLOTS.find((x) => x.id === plotId);
+    const b = p && this.bubblePos(p);
+    return b ? this.camera.toScreen(b.x, b.y) : null;
+  }
+
   private bubbleHit(sx: number, sy: number): string | null {
     const w = this.camera.toWorld(sx, sy);
     for (const p of PLOTS) {
@@ -202,7 +209,9 @@ export class CityView {
   focusPlot(plotId: string): void {
     const p = PLOTS.find((x) => x.id === plotId)!;
     const r = this.plotRect(p);
-    this.camera.centerOn(r.cx, r.bottom - r.h * 0.4, true);
+    // the rail and works column cover the left of the screen; shift the subject right of them
+    const leftUi = Math.min(330, this.camera.width * 0.3);
+    this.camera.centerOn(r.cx - leftUi / 2 / this.camera.zoom, r.bottom - r.h * 0.4, true);
   }
 
   /** Celebrate a finished upgrade: the building bounces, a seal is stamped, gold leaf flies. */

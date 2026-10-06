@@ -162,6 +162,8 @@ export interface GameState {
   muted: boolean;
   /** optional so older saves load without a migration */
   hapticsOff?: boolean;
+  /** guided first-session tutorial progress */
+  ftueStep?: number;
   musicOff?: boolean;
 }
 

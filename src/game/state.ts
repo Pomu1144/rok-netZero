@@ -178,6 +178,8 @@ export interface GameState {
   /** guided first-session tutorial progress */
   ftueStep?: number;
   musicOff?: boolean;
+  /** interface language (see src/i18n) */
+  lang?: 'en' | 'es' | 'ja' | 'zh';
   /** accessibility: text scale, motion preference, colour-safe palette */
   a11y?: { text?: number; motion?: 'system' | 'reduce' | 'full'; colorSafe?: boolean };
   /** seven-day login calendar (see daily.ts) */

@@ -3,6 +3,7 @@ import { isHidden, marchPosition } from '../game/logic';
 import { PLAYER_POS, WORLD_SIZE, type GameState } from '../game/state';
 import type { Camera } from './camera';
 import { colorSafe, routeColor } from '../a11y';
+import { t } from '../i18n';
 
 /**
  * The kingdom view: far zoomed out, the realm becomes a painted ink map with
@@ -54,6 +55,7 @@ function seal(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, gl
 }
 
 function label(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, size: number, color: string, alpha: number): void {
+  text = t(text);
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.font = `700 ${size}px 'Kaisei Tokumin', serif`;
@@ -209,7 +211,7 @@ export function drawLegend(ctx: CanvasRenderingContext2D, x: number, y: number, 
     ctx.font = "600 12px 'Kaisei Tokumin', serif";
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText(name, x + 34, cy);
+    ctx.fillText(t(name), x + 34, cy);
   });
   const cy = y - h + 16 + rows.length * 22;
   ctx.fillStyle = 'rgba(160,32,24,0.85)';
@@ -220,6 +222,6 @@ export function drawLegend(ctx: CanvasRenderingContext2D, x: number, y: number, 
   ctx.lineTo(x + 14, cy);
   ctx.fill();
   ctx.fillStyle = '#2a2014';
-  ctx.fillText('Barbarian camp', x + 34, cy);
+  ctx.fillText(t('Barbarian camp'), x + 34, cy);
   ctx.restore();
 }

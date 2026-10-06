@@ -5298,3 +5298,17 @@ html.color-safe .bar.green > div {
   text-align: left;
   white-space: pre-wrap;
 }
+
+/* ── languages: CJK type stacks (the self-hosted display fonts are Latin subsets) */
+html[lang='ja'] {
+  --serif: 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', 'Noto Serif CJK JP', 'Kaisei Tokumin', serif;
+  --cinzel: 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', 'Noto Serif CJK JP', 'Cinzel', serif;
+}
+html[lang='zh-Hans'] {
+  --serif: 'Songti SC', 'STSong', 'Noto Serif SC', 'Noto Serif CJK SC', 'Source Han Serif SC', 'SimSun', serif;
+  --cinzel: 'Songti SC', 'STSong', 'Noto Serif SC', 'Noto Serif CJK SC', 'Cinzel', serif;
+}
+html[lang='ja'] .kicker,
+html[lang='zh-Hans'] .kicker {
+  letter-spacing: 0.08em;
+}

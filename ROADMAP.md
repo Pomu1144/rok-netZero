@@ -40,7 +40,7 @@ Legend: `[x]` done · `[ ]` to do · **(you)** needs the owner (accounts, signin
 
 - [x] Haptics on key actions
 - [x] Accessibility: text scale, reduced motion, colour-blind safe markers
-- [ ] Localisation: English, Spanish, Japanese, Simplified Chinese
+- [x] Localisation: English, Spanish, Japanese, Simplified Chinese
 - [ ] Performance budget: 60 fps on iPhone 11, texture memory under 300 MB, cold start under 3 s
 - [x] Crash safety: save versioning and migrations, error boundary with recovery
 - [ ] Final store screenshots and preview video

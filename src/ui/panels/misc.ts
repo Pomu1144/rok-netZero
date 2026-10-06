@@ -1,4 +1,5 @@
 import { assetUrl } from '../../assets';
+import { LANGS, lang, type Lang } from '../../i18n';
 import { TEXT_SIZES, applyA11y, type MotionPref } from '../../a11y';
 import { setMuted, setMusic, sfx } from '../../audio';
 import { persistSave, setHaptics } from '../../native';
@@ -267,6 +268,10 @@ export function openSettings(ctx: UiCtx): void {
           <button class="btn ${s.musicOff ? '' : 'btn-gold'}" data-act="music">Music ${s.musicOff ? 'off' : 'on'}</button>
           <button class="btn ${s.hapticsOff ? '' : 'btn-gold'}" data-act="haptics">Vibration ${s.hapticsOff ? 'off' : 'on'}</button>
         </div>
+        <h3 class="sec">Language</h3>
+        <div class="row" style="flex-wrap:wrap" role="group" aria-label="Language">
+          ${LANGS.map((l) => `<button class="btn btn-sm ${lang() === l.id ? 'btn-gold' : ''}" data-act="lang" data-v="${l.id}" lang="${l.html}" translate="no">${l.name}</button>`).join('')}
+        </div>
         <h3 class="sec">Accessibility</h3>
         <div class="muted">Text size</div>
         <div class="row" style="flex-wrap:wrap;margin:6px 0 10px" role="group" aria-label="Text size">
@@ -297,6 +302,13 @@ export function openSettings(ctx: UiCtx): void {
         <button class="btn btn-red" data-act="reset">Found a new kingdom</button>`;
       onAct(body, {
         speed: (t) => ctx.game.act((st) => void (st.speed = Number(t.dataset.v))),
+        lang: (t) => {
+          const v = t.dataset.v as Lang;
+          if (v === lang()) return;
+          ctx.game.act((st) => void (st.lang = v));
+          ctx.game.save();
+          location.reload();
+        },
         text: (t) => {
           ctx.game.act((st) => void (st.a11y = { ...st.a11y, text: Number(t.dataset.v) }));
           applyA11y(ctx.game.state);

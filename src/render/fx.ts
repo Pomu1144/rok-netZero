@@ -1,4 +1,5 @@
 import { img } from '../assets';
+import { t } from '../i18n';
 
 /**
  * World-space effects shared by the city and world renderers: textured particles
@@ -260,6 +261,7 @@ export function mirroredPattern(ctx: CanvasRenderingContext2D, name: string, tin
 
 /** Ink-style label plate: charcoal, hairline gold edge, serif text. */
 export function inkLabel(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, k: number, accent = 'rgba(226,204,150,0.55)'): void {
+  text = t(text);
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(k, k);

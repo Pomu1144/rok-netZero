@@ -36,6 +36,8 @@ import { clearReminders, haptic, initStorage, nativeReady, onAppState, registerS
 import { BUILDING_KANJI, ink, type InkIcon } from './ui/ink';
 import { openCommander, openCommanders, openMarch, openTavern } from './ui/panels/army';
 import { openBuilding, openHospital, openResearch, openSpeedup, openTrain } from './ui/panels/city';
+import { openCalendar, openDaily } from './ui/panels/daily';
+import { dayKey, loginClaimable, rollDaily } from './game/daily';
 import { openAdvisor, openBag, openMail, openProfile, openQuests, openSettings, questGo } from './ui/panels/misc';
 
 registerServiceWorker();
@@ -350,6 +352,8 @@ const hud = new Hud(ctx, {
     if (id === 'quests') openQuests(ctx);
     if (id === 'mail') openMail(ctx);
     if (id === 'settings') openSettings(ctx);
+    if (id === 'calendar') openCalendar(ctx);
+    if (id === 'daily') openDaily(ctx);
   },
   openJob: (jobId) => openSpeedup(ctx, jobId),
   openMarchInfo: (marchId) => {
@@ -524,8 +528,12 @@ async function boot(): Promise<void> {
         toast(`While you were away · ${offline.length} events`, 'info');
         refreshLiveModals();
       }
+      game.act((s) => void rollDaily(s, dayKey()));
       if (!game.state.tutorialDone) {
         setTimeout(() => openAdvisor(ctx, () => game.act((s) => void (s.tutorialDone = true))), 900);
+      } else if (!tutorial.active && loginClaimable(game.state, dayKey()) >= 0) {
+        // returning players are greeted by the day's gift
+        setTimeout(() => !anyModalOpen() && openCalendar(ctx), 1300);
       }
     },
     { once: true },
@@ -533,6 +541,10 @@ async function boot(): Promise<void> {
 }
 
 window.addEventListener('beforeunload', () => game.save());
+// the calendar can turn while the game is open
+setInterval(() => {
+  if (game.state.daily && game.state.daily.day !== dayKey()) game.act((s) => void rollDaily(s, dayKey()));
+}, 30_000);
 
 /** Turn running timers into device reminders, converting game time to wall-clock time. */
 function reminders(): Reminder[] {
@@ -549,6 +561,12 @@ function reminders(): Reminder[] {
   for (const m of s.marches) if (m.phase === 'gathering' && m.gatherEnd) out.push({ id: id++, at: real(m.gatherEnd), title: 'Gathering complete', body: 'Your gatherers are heading home.' });
   if (s.raid) out.push({ id: id++, at: real(s.raid.arriveAt) - 60_000, title: 'Barbarians at the gates!', body: 'A warband reaches your walls within the minute.' });
   if (s.tavern.silverFreeAt > s.time) out.push({ id: id++, at: real(s.tavern.silverFreeAt), title: 'Free chest', body: 'A free Silver Chest awaits in the Tavern.' });
+  // tomorrow evening: the next login gift
+  const eve = new Date();
+  eve.setDate(eve.getDate() + 1);
+  eve.setHours(19, 0, 0, 0);
+  const n = loginClaimable(s, dayKey(eve));
+  if (n >= 0) out.push({ id: id++, at: eve.getTime(), title: 'A gift from the court', body: `Your Day ${n + 1} reward is waiting. Return to claim it.` });
   return out;
 }
 
@@ -565,6 +583,7 @@ onAppState(
     const away = Date.now() - pausedAt;
     pausedAt = 0;
     void clearReminders();
+    game.act((s) => void rollDaily(s, dayKey()));
     if (away > 2000) {
       const ev = game.resumeAfter(away);
       if (ev.length > 2) toast(`While you were away · ${ev.length} events`, 'info');

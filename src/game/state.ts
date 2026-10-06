@@ -165,6 +165,10 @@ export interface GameState {
   /** guided first-session tutorial progress */
   ftueStep?: number;
   musicOff?: boolean;
+  /** seven-day login calendar (see daily.ts) */
+  login?: { claimed: number; last: string; cycles: number };
+  /** today's task baseline and opened activity chests */
+  daily?: { day: string; base: Record<'collections' | 'troopsTrained' | 'barbsKilled' | 'gathered' | 'researchDone' | 'chestsOpened' | 'buildLevels', number>; chests: number[] };
 }
 
 export const SAVE_VERSION = 1;

@@ -19,8 +19,8 @@ Legend: `[x]` done · `[ ]` to do · **(you)** needs the owner (accounts, signin
 ## Phase 2: first session and retention
 
 - [x] Guided first-time tutorial: pointing hand and spotlight through the first 10 actions
-- [ ] Seven-day login reward calendar
-- [ ] Daily tasks with an activity chest
+- [x] Seven-day login reward calendar
+- [x] Daily tasks with an activity chest
 - [x] Local notifications: build complete, training complete, raid incoming, free chest ready
 - [ ] Achievements panel
 - [ ] Offline-earnings summary screen on return

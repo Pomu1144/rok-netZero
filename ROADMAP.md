@@ -22,8 +22,8 @@ Legend: `[x]` done · `[ ]` to do · **(you)** needs the owner (accounts, signin
 - [x] Seven-day login reward calendar
 - [x] Daily tasks with an activity chest
 - [x] Local notifications: build complete, training complete, raid incoming, free chest ready
-- [ ] Achievements panel
-- [ ] Offline-earnings summary screen on return
+- [x] Achievements panel
+- [x] Offline-earnings summary screen on return
 
 ## Phase 3: depth
 

@@ -37,6 +37,8 @@ import { BUILDING_KANJI, ink, type InkIcon } from './ui/ink';
 import { openCommander, openCommanders, openMarch, openTavern } from './ui/panels/army';
 import { openBuilding, openHospital, openResearch, openSpeedup, openTrain } from './ui/panels/city';
 import { openCalendar, openDaily } from './ui/panels/daily';
+import { openAway, openHonours } from './ui/panels/honours';
+import { awaySnapshot, awaySummary, awayWorthShowing, type AwaySummary } from './game/away';
 import { dayKey, loginClaimable, rollDaily } from './game/daily';
 import { openAdvisor, openBag, openMail, openProfile, openQuests, openSettings, questGo } from './ui/panels/misc';
 
@@ -354,6 +356,7 @@ const hud = new Hud(ctx, {
     if (id === 'settings') openSettings(ctx);
     if (id === 'calendar') openCalendar(ctx);
     if (id === 'daily') openDaily(ctx);
+    if (id === 'honours') openHonours(ctx);
   },
   openJob: (jobId) => openSpeedup(ctx, jobId),
   openMarchInfo: (marchId) => {
@@ -523,17 +526,16 @@ async function boot(): Promise<void> {
         video.pause();
         title.remove();
       }, 1000);
+      const awayMs = game.offlineMs;
+      const before = awaySnapshot(game.state);
       const offline = game.catchUp();
-      if (offline.length) {
-        toast(`While you were away · ${offline.length} events`, 'info');
-        refreshLiveModals();
-      }
+      if (offline.length) refreshLiveModals();
       game.act((s) => void rollDaily(s, dayKey()));
       if (!game.state.tutorialDone) {
         setTimeout(() => openAdvisor(ctx, () => game.act((s) => void (s.tutorialDone = true))), 900);
-      } else if (!tutorial.active && loginClaimable(game.state, dayKey()) >= 0) {
-        // returning players are greeted by the day's gift
-        setTimeout(() => !anyModalOpen() && openCalendar(ctx), 1300);
+      } else if (!tutorial.active) {
+        // returning players: what happened while away, then the day's gift
+        setTimeout(() => welcomeBack(awaySummary(before, game.state, offline, awayMs), game.offlineCapped), 1100);
       }
     },
     { once: true },
@@ -541,6 +543,15 @@ async function boot(): Promise<void> {
 }
 
 window.addEventListener('beforeunload', () => game.save());
+
+/** The welcome-back report (when there is something to report), followed by the day's gift. */
+function welcomeBack(a: AwaySummary, capped: boolean): void {
+  const gift = () => {
+    if (!anyModalOpen() && !tutorial.active && loginClaimable(game.state, dayKey()) >= 0) openCalendar(ctx);
+  };
+  if (awayWorthShowing(a) && !anyModalOpen()) openAway(ctx, a, capped, () => setTimeout(gift, 350));
+  else gift();
+}
 // the calendar can turn while the game is open
 setInterval(() => {
   if (game.state.daily && game.state.daily.day !== dayKey()) game.act((s) => void rollDaily(s, dayKey()));
@@ -585,8 +596,9 @@ onAppState(
     void clearReminders();
     game.act((s) => void rollDaily(s, dayKey()));
     if (away > 2000) {
+      const before = awaySnapshot(game.state);
       const ev = game.resumeAfter(away);
-      if (ev.length > 2) toast(`While you were away · ${ev.length} events`, 'info');
+      if (game.state.tutorialDone && !tutorial.active) welcomeBack(awaySummary(before, game.state, ev, away), game.offlineCapped);
     }
   },
   () => {

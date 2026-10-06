@@ -20,7 +20,7 @@ function heroIcon(r: Reward): string {
 }
 
 /** Coins fly from the button into the HUD for each resource the reward grants. */
-function celebrate(from: HTMLElement, r: Reward): void {
+export function celebrate(from: HTMLElement, r: Reward): void {
   const b = from.getBoundingClientRect();
   const x = b.left + b.width / 2;
   const y = b.top + b.height / 2;

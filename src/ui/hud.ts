@@ -5,6 +5,7 @@ import { TECH_BY_ID } from '../data/research';
 import { TROOP_SPRITES } from '../data/troops';
 import { RES_KEYS, type TroopType } from '../data/types';
 import { FREE_FINISH_SECONDS, canAfford, cityHallLevel, findObj, objLabel, totalPower, upgradeInfo } from '../game/logic';
+import { achievementBadge } from '../game/achievements';
 import { dailyBadge, dayKey, loginClaimable } from '../game/daily';
 import { activeQuests, questDone } from '../game/quests';
 import { MAX_AP } from '../game/state';
@@ -75,6 +76,7 @@ export class Hud {
       el(`<div class="events" data-part="events">
         <button class="ev-btn" data-nav="calendar" aria-label="Login gifts"><img src="${assetUrl('ev_calendar')}" alt=""><span>Gifts</span><span class="badge hidden" data-badge="calendar"></span></button>
         <button class="ev-btn" data-nav="daily" aria-label="Daily duties"><img src="${assetUrl('ev_daily')}" alt=""><span>Duties</span><span class="badge hidden" data-badge="daily"></span></button>
+        <button class="ev-btn" data-nav="honours" aria-label="Hall of honours"><img src="${assetUrl('ev_honours')}" alt=""><span>Honours</span><span class="badge hidden" data-badge="honours"></span></button>
       </div>`),
     );
     this.root.appendChild(
@@ -215,6 +217,7 @@ export class Hud {
     badge('quests', claimable);
     badge('calendar', loginClaimable(s, dayKey()) >= 0 ? 1 : 0);
     badge('daily', dailyBadge(s));
+    badge('honours', achievementBadge(s));
     badge('commanders', Object.values(s.commanders).some((c) => !c.unlocked && c.sculptures >= 10) ? 1 : 0);
 
     this.root.querySelectorAll('.rail-btn[data-nav=city], .rail-btn[data-nav=world]').forEach((b) => {

@@ -167,6 +167,8 @@ export interface GameState {
   musicOff?: boolean;
   /** seven-day login calendar (see daily.ts) */
   login?: { claimed: number; last: string; cycles: number };
+  /** honours: tiers claimed per achievement id (see achievements.ts) */
+  achievements?: Record<string, number>;
   /** today's task baseline and opened activity chests */
   daily?: { day: string; base: Record<'collections' | 'troopsTrained' | 'barbsKilled' | 'gathered' | 'researchDone' | 'chestsOpened' | 'buildLevels', number>; chests: number[] };
 }

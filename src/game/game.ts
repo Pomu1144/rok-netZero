@@ -16,12 +16,16 @@ export class Game {
   lastReal = performance.now();
   private saveTimer = 0;
   offlineMs = 0;
+  /** true when the last offline stretch hit the cap */
+  offlineCapped = false;
 
   constructor() {
     const loaded = loadGame();
     if (loaded) {
       this.state = loaded.state;
-      this.offlineMs = Math.min(OFFLINE_CAP_MS, Math.max(0, Date.now() - loaded.savedAt));
+      const away = Math.max(0, Date.now() - loaded.savedAt);
+      this.offlineMs = Math.min(OFFLINE_CAP_MS, away);
+      this.offlineCapped = away > OFFLINE_CAP_MS;
     } else {
       this.state = newGame();
     }
@@ -32,6 +36,7 @@ export class Game {
   resumeAfter(realMs: number): GameEvent[] {
     this.lastReal = performance.now();
     this.offlineMs = Math.min(OFFLINE_CAP_MS, Math.max(0, realMs));
+    this.offlineCapped = realMs > OFFLINE_CAP_MS;
     const events = this.catchUp();
     if (events.length) {
       this.emitEvents(events);

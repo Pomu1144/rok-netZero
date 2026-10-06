@@ -3537,6 +3537,10 @@ canvas.flow {
     width: 48px;
     height: 48px;
   }
+  .ev-btn > span:not(.badge) {
+    font-size: 9px;
+    letter-spacing: 0.06em;
+  }
   .cal-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -3607,6 +3611,199 @@ canvas.flow {
   .ev-btn img,
   .act-chest.ready img,
   .cal-day.today .cal-art {
+    animation: none !important;
+  }
+}
+
+/* ── honours ─────────────────────────────────────────────────────────── */
+.hon-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.hon {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(241, 235, 220, 0.03);
+  box-shadow: inset 0 0 0 1px var(--line);
+  animation: slideIn 0.4s var(--ease) both;
+}
+.hon-medal {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.55));
+}
+.hon.none .hon-medal {
+  filter: grayscale(1) brightness(0.45) drop-shadow(0 5px 8px rgba(0, 0, 0, 0.55));
+}
+.hon.ready {
+  box-shadow: inset 0 0 0 1px var(--accent), 0 0 18px rgba(201, 162, 78, 0.2);
+}
+.hon.ready .hon-medal {
+  animation: calBob 1.8s ease-in-out infinite;
+}
+.hon.complete {
+  background: radial-gradient(ellipse at 10% 50%, rgba(232, 207, 140, 0.16), transparent 60%), rgba(241, 235, 220, 0.03);
+}
+.hon-name {
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.hon-desc {
+  font-size: 12px;
+  color: var(--dim);
+  margin: 1px 0 5px;
+}
+.hon-pips {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 5px;
+  font-size: 11px;
+}
+.hon-pips .num {
+  margin-left: 6px;
+}
+.pip {
+  width: 11px;
+  height: 11px;
+  transform: rotate(45deg);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.pip.on.t1 { background: #b8743a; }
+.pip.on.t2 { background: #d6dbe2; }
+.pip.on.t3 { background: var(--accent-2); }
+.pip.ready {
+  box-shadow: inset 0 0 0 1px var(--accent-2), 0 0 8px rgba(232, 207, 140, 0.7);
+}
+.hon-reward .rewards {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 11px;
+}
+.hon .bar {
+  height: 4px;
+}
+
+/* ── welcome back ────────────────────────────────────────────────────── */
+.away-hero {
+  position: relative;
+  height: 170px;
+  margin: -4px 0 14px;
+  background: center 40% / cover no-repeat;
+  box-shadow: inset 0 0 0 1px var(--line);
+  -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent);
+  mask-image: linear-gradient(180deg, #000 70%, transparent);
+}
+.away-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(246, 238, 216, 0.92) 0%, rgba(246, 238, 216, 0.55) 30%, transparent 55%);
+}
+.away-hero p {
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  margin: 0;
+  max-width: 34%;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1d1a14;
+  text-shadow: 0 0 10px rgba(246, 238, 216, 0.9), 0 0 2px rgba(246, 238, 216, 1);
+}
+.away-sec {
+  margin-bottom: 14px;
+}
+.away-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+.away-row.taken {
+  opacity: 0.4;
+}
+.away-res {
+  display: grid;
+  justify-items: center;
+  min-width: 96px;
+  padding: 10px 12px;
+  background: rgba(241, 235, 220, 0.04);
+  box-shadow: inset 0 0 0 1px var(--line);
+  animation: slideIn 0.4s var(--ease) both;
+}
+.away-res b {
+  font-size: 20px;
+  color: var(--accent-2);
+  margin-top: 4px;
+}
+.away-res small {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.away-cta {
+  display: block;
+  margin: 14px auto 0;
+  min-width: 240px;
+}
+.away-log {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.away-log li {
+  padding: 6px 0 6px 22px;
+  border-bottom: 1px solid var(--line);
+  background: url('/assets/ink/ink_tick.webp') 0 50% / 14px no-repeat;
+  font-size: 13px;
+}
+.away-log li.bad {
+  color: var(--red-2);
+  background-image: url('/assets/ink/ink_x.webp');
+}
+
+@media (max-width: 760px) {
+  .hon-grid {
+    grid-template-columns: 1fr;
+  }
+  .hon-medal {
+    width: 46px;
+    height: 46px;
+  }
+  .hon-reward {
+    display: none;
+  }
+  .away-hero {
+    height: 120px;
+  }
+  .away-hero p {
+    max-width: 62%;
+    font-size: 13px;
+  }
+  .away-res {
+    min-width: 0;
+    flex: 1 1 28%;
+  }
+}
+@media (max-height: 540px) and (min-width: 761px) {
+  .away-hero {
+    height: 96px;
+  }
+  .hon-medal {
+    width: 42px;
+    height: 42px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hon.ready .hon-medal {
     animation: none !important;
   }
 }

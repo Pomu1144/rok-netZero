@@ -40,6 +40,7 @@ import {
   troopTime,
 } from '../data/troops';
 import { RES_KEYS, addBonuses, type BonusKey, type Bonuses, type Cost, type ResKey, type TroopType } from '../data/types';
+import { talentBonuses } from './talents';
 import { simulateBattle, troopPower, type BattleResult } from './battle';
 import { Rng } from './rng';
 import {
@@ -129,6 +130,7 @@ export function marchBonuses(s: GameState, commanderId: string | null): Bonuses 
       addBonuses(b, { [sk.bonus]: sk.values[cs.skills[i] - 1] });
     }
   });
+  addBonuses(b, talentBonuses(s, commanderId));
   return b;
 }
 

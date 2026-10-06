@@ -37,6 +37,8 @@ export interface CommanderState {
   stars: number;
   skills: number[];
   sculptures: number;
+  /** talent ranks by node id (see data/talents.ts); optional for older saves */
+  talents?: Record<string, number>;
 }
 
 export type WorldKind = 'barbarian' | 'fort' | 'node' | 'city' | 'holy' | 'deco';

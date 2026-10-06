@@ -3826,3 +3826,216 @@ canvas.flow {
 .bld-next b {
   color: var(--accent-2);
 }
+
+/* ── commander talents ───────────────────────────────────────────────── */
+.tal-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+.tal-portrait {
+  width: 64px;
+  height: 64px;
+  flex: none;
+  background: center 20% / cover;
+  box-shadow: inset 0 0 0 1px var(--line-2), 0 6px 14px rgba(0, 0, 0, 0.5);
+}
+.tal-pts {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.tal-pts b {
+  font-size: 28px;
+  color: var(--accent-2);
+}
+.tal-pts small {
+  color: var(--faint);
+}
+.tal-tabs {
+  display: none;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.tal-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 6px;
+  background: rgba(241, 235, 220, 0.03);
+  box-shadow: inset 0 0 0 1px var(--line);
+  border: 0;
+  color: var(--dim);
+  font: 700 12px var(--serif);
+  cursor: pointer;
+}
+.tal-tab.sel {
+  color: var(--text-hi);
+  box-shadow: inset 0 0 0 1px var(--accent), inset 0 -2px 0 var(--accent);
+}
+.tal-tab .seal,
+.tal-tree header .seal {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  background: url('/assets/ink/seal_solid.webp') center / 100% 100% no-repeat;
+  color: #fff3e6;
+  font-weight: 900;
+  font-size: 14px;
+}
+.tal-trees {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.tal-tree {
+  padding: 10px;
+  background: rgba(241, 235, 220, 0.025);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.tal-tree header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.tal-tree header .seal {
+  width: 34px;
+  height: 34px;
+  font-size: 18px;
+}
+.tal-tname {
+  font: 700 16px var(--cinzel);
+  letter-spacing: 0.06em;
+}
+.tal-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.tal-row:has(.cap) {
+  grid-template-columns: 1fr;
+}
+.tal-gate {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.tal-node {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+  padding: 8px;
+  text-align: left;
+  background: rgba(8, 8, 9, 0.5);
+  box-shadow: inset 0 0 0 1px var(--line);
+  border: 0;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.15s var(--ease), background 0.2s;
+}
+.tal-ic {
+  grid-row: 1 / 3;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  background: url('/assets/ink/ink_enso_gold.webp') center / contain no-repeat;
+}
+.tal-node.cap .tal-ic {
+  width: 48px;
+  height: 48px;
+}
+.tal-name {
+  grid-column: 2;
+  grid-row: 1;
+  font-weight: 700;
+  font-size: 12.5px;
+  line-height: 1.15;
+}
+.tal-bonus {
+  grid-column: 2 / 4;
+  grid-row: 2;
+  font-size: 10.5px;
+  color: var(--dim);
+}
+.tal-rank {
+  grid-column: 3;
+  grid-row: 1;
+  align-self: start;
+  font-size: 11px;
+  color: var(--faint);
+}
+.tal-node.can {
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.tal-node.can:hover {
+  transform: translateY(-1px);
+  background: rgba(36, 32, 26, 0.7);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.tal-node.can .tal-rank {
+  color: var(--accent-2);
+}
+.tal-node.maxed {
+  background: radial-gradient(ellipse at 15% 50%, rgba(232, 207, 140, 0.18), transparent 60%), rgba(8, 8, 9, 0.5);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.tal-node.maxed .tal-rank {
+  color: var(--accent-2);
+}
+.tal-node.shut {
+  opacity: 0.35;
+  cursor: default;
+}
+.tal-node[aria-disabled='true'] {
+  cursor: default;
+}
+.tal-node.cap {
+  padding: 10px;
+}
+.tal-node.cap .tal-name {
+  font-family: var(--cinzel);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 760px), (max-height: 540px) and (min-width: 761px) {
+  .tal-tabs {
+    display: flex;
+  }
+  .tal-trees {
+    grid-template-columns: 1fr;
+  }
+  .tal-tree:not(.on) {
+    display: none;
+  }
+  .tal-tree header {
+    display: none;
+  }
+}
+@media (max-height: 540px) and (min-width: 761px) {
+  .tal-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .tal-head {
+    margin-bottom: 6px;
+  }
+}

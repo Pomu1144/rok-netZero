@@ -16,6 +16,9 @@ import { ITEMS } from '../../data/items';
 import { TROOP_NAMES, troopIdSprite } from '../../data/troops';
 import type { TroopType } from '../../data/types';
 import { troopPower } from '../../game/battle';
+import { BONUS_LABEL, ROW_GATE } from '../../data/talents';
+import { canLearn, commanderTrees, freePoints, learnTalent, pointsInTree, resetTalents, rowOpen, talentPoints, talentRank } from '../../game/talents';
+import { haptic } from '../../native';
 import {
   BARB_AP_COST,
   FORT_AP_COST,
@@ -111,6 +114,7 @@ export function openCommander(ctx: UiCtx, id: string): void {
                      <div class="muted" style="margin-top:4px;font-size:11.5px">${fmtFull(c.xp)} / ${fmtFull(need)} experience</div>
                      <div class="action-row" style="justify-content:flex-start;margin-top:12px">
                        ${tomes.map((t) => `<button class="btn btn-sm" data-act="tome" data-item="${t}">${icon('ic_tome', 18)} ${ITEMS[t].name} · ${s.items[t]}</button>`).join('') || '<span class="muted">No tomes — slay barbarians to gain experience.</span>'}
+                       <button class="btn btn-sm ${freePoints(s, id) > 0 ? 'btn-gold' : ''}" data-act="talents">${ink('i_star', 15)} Talents${freePoints(s, id) > 0 ? ` · ${freePoints(s, id)} to spend` : ''}</button>
                        ${c.stars < MAX_STARS ? `<button class="btn btn-sm btn-gold" data-act="star" ${c.level < cap ? 'disabled' : ''} title="Requires Lv.${cap}">${ink('i_star', 15)} Ascend · ${icon('ic_sculpture', 15)}${star.sculptures} ${icon('ic_gold', 15)}${fmt(star.gold)}</button>` : ''}
                      </div>
                    </div>`
@@ -147,6 +151,90 @@ export function openCommander(ctx: UiCtx, id: string): void {
           if (ctx.run((st) => unlockCommander(st, id), sfx.fanfare)) toast(`${def.name} joins your cause`, 'good', def.portrait);
         },
         skill: (t) => ctx.run((st) => upgradeSkill(st, id, Number(t.dataset.i)), sfx.fanfare),
+        talents: () => openTalents(ctx, id),
+      });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// talents
+
+const pct = (v: number) => `${+(v * 100).toFixed(1)}%`;
+
+export function openTalents(ctx: UiCtx, id: string): void {
+  const def = COMMANDER_BY_ID[id];
+  const trees = commanderTrees(id);
+  let tab = 0;
+  openModal({
+    title: `${def.name} · Talents`,
+    seal: '才',
+    kicker: 'One point for every level',
+    size: 'wide',
+    live: true,
+    render: (body, h) => {
+      const s = ctx.game.state;
+      const free = freePoints(s, id);
+      const total = talentPoints(s, id);
+      body.innerHTML = `
+        <div class="tal-head">
+          <div class="tal-portrait" style="background-image:url(${assetUrl(def.portrait)})"></div>
+          <div class="grow">
+            <div class="kicker">Talent points</div>
+            <div class="tal-pts"><b class="num">${free}</b><small>free of ${total}</small></div>
+            <div class="muted" style="font-size:12px">Each tree opens deeper rows at ${ROW_GATE.slice(1).join(', ')} points.</div>
+          </div>
+          <button class="btn btn-sm" data-act="reset" ${total - free === 0 ? 'disabled' : ''}>Reset (free)</button>
+        </div>
+        <div class="tal-tabs">${trees.map((t, i) => `<button class="tal-tab ${i === tab ? 'sel' : ''}" data-act="tab" data-i="${i}"><span class="seal">${t.kanji}</span>${t.name}</button>`).join('')}</div>
+        <div class="tal-trees">
+          ${trees
+            .map((t, ti) => {
+              const inTree = pointsInTree(s, id, t);
+              const rows = [0, 1, 2, 3]
+                .map((r) => {
+                  const open = rowOpen(s, id, t, r);
+                  const nodes = t.nodes
+                    .filter((n) => n.row === r)
+                    .map((n) => {
+                      const rank = talentRank(s, id, n.id);
+                      const can = canLearn(s, id, n.id);
+                      const maxed = rank >= n.max;
+                      return `<button class="tal-node ${maxed ? 'maxed' : ''} ${can ? 'can' : ''} ${!open ? 'shut' : ''} ${n.row === 3 ? 'cap' : ''}" data-act="learn" data-id="${n.id}" ${can ? '' : 'aria-disabled="true"'}>
+                        <span class="tal-ic">${ink(n.icon, n.row === 3 ? 30 : 24, rank > 0 ? 'gold' : 'cream')}</span>
+                        <span class="tal-name">${n.name}</span>
+                        <span class="tal-bonus">+${pct(n.per * Math.max(1, rank))} ${BONUS_LABEL[n.bonus] ?? n.bonus}</span>
+                        <span class="tal-rank num">${rank}/${n.max}</span>
+                      </button>`;
+                    })
+                    .join('');
+                  return `<div class="tal-row ${open ? '' : 'shut'}">${open ? '' : `<div class="tal-gate">${ink('i_lock', 12)} ${ROW_GATE[r]} points in ${t.name}</div>`}${nodes}</div>`;
+                })
+                .join('');
+              return `<section class="tal-tree ${ti === tab ? 'on' : ''}">
+                <header><span class="seal">${t.kanji}</span><div class="grow"><div class="tal-tname">${t.name}</div><div class="kicker">${inTree} points</div></div></header>
+                ${rows}
+              </section>`;
+            })
+            .join('')}
+        </div>`;
+      onAct(body, {
+        learn: (el) => {
+          if (ctx.game.act((st) => (learnTalent(st, id, el.dataset.id!) ? { ok: true } : { ok: false, reason: 'locked' })).ok) {
+            sfx.stamp();
+            haptic('tap');
+          } else sfx.error();
+        },
+        tab: (el) => {
+          tab = Number(el.dataset.i);
+          sfx.click();
+          h.refresh();
+        },
+        reset: () => {
+          ctx.game.act((st) => resetTalents(st, id));
+          sfx.brush();
+          toast('Talents returned · spend them anew', 'info', def.portrait);
+        },
       });
     },
   });

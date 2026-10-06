@@ -8,7 +8,7 @@ import { isHidden, marchPosition, maxBarbLevel, objSprite } from '../game/logic'
 import { PLAYER_POS, WORLD_SIZE, type WorldObj } from '../game/state';
 import { Camera } from './camera';
 import type { March } from '../game/state';
-import { Fx, inkLabel, mirroredPattern } from './fx';
+import { Fx, bakedSprite, drawBaked, inkLabel, mirroredPattern } from './fx';
 
 export const T = 64;
 
@@ -16,11 +16,49 @@ const SIZES: Record<string, number> = {
   barbarian: 2.3, fort: 3.4, node: 2.2, city: 3.2, holy: 3.6, mountain: 4.2, forest: 3.2, lake: 3.2, pass: 3.6,
 };
 
+type EdgeBand = [CanvasGradient, number, number, number, number];
+
+const EDGE_STOPS: [number, number][] = [
+  [0, 0],
+  [0.3, 0.9],
+  [0.62, 0.9],
+  [1, 0],
+];
+
+/**
+ * Gradient bands that darken the world's edges into ink, from OUT beyond each edge
+ * to IN inside it, with rounded corner pieces so the bands meet without seams.
+ */
+function inkEdgeBands(ctx: CanvasRenderingContext2D, size: number): EdgeBand[] {
+  const OUT = 180;
+  const IN = 120;
+  const D = OUT + IN;
+  const ink = (g: CanvasGradient, reverse = false): CanvasGradient => {
+    for (const [at, a] of EDGE_STOPS) g.addColorStop(reverse ? 1 - at : at, `rgba(12,12,10,${a})`);
+    return g;
+  };
+  const lin = (x0: number, y0: number, x1: number, y1: number) => ink(ctx.createLinearGradient(x0, y0, x1, y1));
+  // corners fade outwards from the inner corner point, so the stops run in reverse
+  const rad = (cx: number, cy: number) => ink(ctx.createRadialGradient(cx, cy, 0, cx, cy, D), true);
+  const mid = size - IN * 2;
+  return [
+    [lin(0, -OUT, 0, IN), IN, -OUT, mid, D],
+    [lin(0, size + OUT, 0, size - IN), IN, size - IN, mid, D],
+    [lin(-OUT, 0, IN, 0), -OUT, IN, D, mid],
+    [lin(size + OUT, 0, size - IN, 0), size - IN, IN, D, mid],
+    [rad(IN, IN), -OUT, -OUT, D, D],
+    [rad(size - IN, IN), size - IN, -OUT, D, D],
+    [rad(IN, size - IN), -OUT, size - IN, D, D],
+    [rad(size - IN, size - IN), size - IN, size - IN, D, D],
+  ];
+}
+
 export class WorldView {
   camera: Camera;
   fx = new Fx();
   private ctx: CanvasRenderingContext2D;
   private ground: CanvasPattern | null = null;
+  private edgeBands: EdgeBand[] | null = null;
   private time = 0;
   private clashes: { x: number; y: number; t: number; win: boolean }[] = [];
   private dustClock = 0;
@@ -173,14 +211,13 @@ export class WorldView {
       ctx.fillRect(0, 0, (WORLD_SIZE * T) / 0.75, (WORLD_SIZE * T) / 0.75);
       ctx.restore();
     }
-    // the known world fades into ink at its edges
-    ctx.save();
-    ctx.filter = 'blur(28px)';
-    ctx.strokeStyle = 'rgba(12,12,10,0.85)';
-    ctx.lineWidth = 140;
-    ctx.strokeRect(-40, -40, WORLD_SIZE * T + 80, WORLD_SIZE * T + 80);
-    ctx.filter = 'none';
-    ctx.restore();
+    // the known world fades into ink at its edges: soft gradient bands rather
+    // than a blurred stroke, which would cost a full-screen filter every frame
+    this.edgeBands ??= inkEdgeBands(ctx, WORLD_SIZE * T);
+    for (const [fill, x, y, w, h] of this.edgeBands) {
+      ctx.fillStyle = fill;
+      ctx.fillRect(x, y, w, h);
+    }
 
     // territory around the player's city: hairline gold with corner ticks
     const tx0 = (PLAYER_POS.x - 6) * T;
@@ -330,8 +367,9 @@ export class WorldView {
       ctx.save();
       ctx.globalAlpha = k > 0.75 ? (1 - k) / 0.25 : 1;
       ctx.translate(c.x + shake, c.y);
-      ctx.filter = 'drop-shadow(0 0 10px rgba(217,96,79,0.9))';
-      ctx.drawImage(sw, -s / 2, -s / 2, s, s);
+      const glow = bakedSprite('ink/i_swords', 'drop-shadow(0 0 14px rgba(217,96,79,0.9))', 40);
+      if (glow) drawBaked(ctx, glow, 40, -s / 2, -s / 2, s);
+      else ctx.drawImage(sw, -s / 2, -s / 2, s, s);
       ctx.restore();
     }
     ctx.globalAlpha = 1;

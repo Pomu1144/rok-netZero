@@ -41,7 +41,7 @@ Legend: `[x]` done · `[ ]` to do · **(you)** needs the owner (accounts, signin
 - [x] Haptics on key actions
 - [x] Accessibility: text scale, reduced motion, colour-blind safe markers
 - [x] Localisation: English, Spanish, Japanese, Simplified Chinese
-- [ ] Performance budget: 60 fps on iPhone 11, texture memory under 300 MB, cold start under 3 s
+- [x] Performance budget: 60 fps on iPhone 11, texture memory under 300 MB, cold start under 3 s (measured at iPhone 11 size in headless Chromium with `npm run perf`; art budget enforced by `tests/budget.test.ts`)
 - [x] Crash safety: save versioning and migrations, error boundary with recovery
 - [ ] Final store screenshots and preview video
 
@@ -52,3 +52,4 @@ Legend: `[x]` done · `[ ]` to do · **(you)** needs the owner (accounts, signin
 - [ ] Signing certificates and provisioning profiles (or a Fastlane match repo)
 - [ ] Final app name check and trademark clearance
 - [ ] Host the privacy policy at a public URL (GitHub Pages works)
+- [ ] Play a TestFlight build on a real iPhone 11 to confirm the frame rate on the device

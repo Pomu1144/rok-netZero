@@ -3,6 +3,7 @@ import { assetUrl, loadAssets } from './assets';
 import { playMusic, setMuted, setMusic, sfx, unlockAudio } from './audio';
 import { BUILDINGS, TIER_LEVELS, spriteFor } from './data/buildings';
 import { COMMANDER_BY_ID } from './data/commanders';
+import { troopIdSprite } from './data/troops';
 import { PLOT_BY_ID } from './data/layout';
 import { Game } from './game/game';
 import {
@@ -539,6 +540,18 @@ function frame(now: number): void {
 // ---------------------------------------------------------------------------
 // boot
 
+/** The tier art this save shows straight away; other tiers load after the title. */
+function firstScreenArt(): (name: string) => boolean {
+  const s = game.state;
+  const need = new Set<string>();
+  for (const [id, b] of Object.entries(s.buildings)) {
+    const type = PLOT_BY_ID[id]?.type ?? (id in BUILDINGS ? (id as keyof typeof BUILDINGS) : null);
+    if (type) need.add(spriteFor(type, b.level));
+  }
+  for (const k of [...Object.keys(s.troops), ...s.marches.flatMap((m) => Object.keys(m.troops))]) need.add(troopIdSprite(k));
+  return (name) => need.has(name);
+}
+
 async function boot(): Promise<void> {
   const title = $('#title-screen');
   const video = $('.t-video', title) as HTMLVideoElement;
@@ -549,7 +562,7 @@ async function boot(): Promise<void> {
       /* autoplay may be blocked; the still frame stays */
     });
   const fill = $('.t-load .fill', title);
-  await loadAssets((p) => (fill.style.width = `${Math.round(p * 100)}%`));
+  await loadAssets((p) => (fill.style.width = `${Math.round(p * 100)}%`), firstScreenArt());
   $('.t-load', title).classList.add('hidden');
   const start = $('.t-enter', title);
   start.classList.remove('hidden');

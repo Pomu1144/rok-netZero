@@ -4,12 +4,14 @@ import { CITY_GRID, PLOTS, type Plot } from '../data/layout';
 import type { Game } from '../game/game';
 import { cityHallLevel, plotUnlockLevel, producerCap, storedAmount, trainingJob } from '../game/logic';
 import { Camera } from './camera';
-import { Fx, inkLabel, inkTimer, mirroredPattern } from './fx';
+import { Fx, bakedSprite, drawBaked, inkLabel, inkTimer, mirroredPattern } from './fx';
 
 export const TW = 128;
 export const TH = 64;
 /** one grid tile in the un-projected ground plane (see GROUND matrix) */
 const G = 64;
+/** Resolution of the cached shadow layer relative to world pixels. */
+const SHADOW_SCALE = 0.5;
 
 export function isoToWorld(gx: number, gy: number): { x: number; y: number } {
   return { x: ((gx - gy) * TW) / 2, y: ((gx + gy) * TH) / 2 };
@@ -97,6 +99,9 @@ export class CityView {
   fx = new Fx();
   private ctx: CanvasRenderingContext2D;
   private patterns: Record<string, CanvasPattern | null> = {};
+  private shadows: { key: string; canvas: HTMLCanvasElement; x: number; y: number } | null = null;
+  private groundCanvas: HTMLCanvasElement | null = null;
+  private groundKey = '';
   private trees = forestRing();
   private walls = wallSegments();
   private walkers: Walker[] = [];
@@ -271,13 +276,11 @@ export class CityView {
     const ctx = this.ctx;
     const dpr = this.canvas.width / Math.max(1, this.canvas.clientWidth);
     const cam = this.camera;
+    const view: [number, number, number, number, number, number] = [dpr * cam.zoom, 0, 0, dpr * cam.zoom, dpr * (cam.width / 2 - cam.x * cam.zoom), dpr * (cam.height / 2 - cam.y * cam.zoom)];
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = '#2f4a22';
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    ctx.setTransform(dpr * cam.zoom, 0, 0, dpr * cam.zoom, dpr * (cam.width / 2 - cam.x * cam.zoom), dpr * (cam.height / 2 - cam.y * cam.zoom));
-    ctx.imageSmoothingQuality = 'high';
-
-    this.drawGround(ctx);
+    ctx.drawImage(this.groundFrame(view), 0, 0);
+    ctx.setTransform(...view);
+    ctx.imageSmoothingQuality = 'medium';
 
     const items: Drawable[] = [];
     for (const t of this.trees) {
@@ -324,19 +327,38 @@ export class CityView {
   }
 
   /** Paint a texture onto the iso ground plane over a tile rectangle. */
-  private groundRect(ctx: CanvasRenderingContext2D, gx0: number, gy0: number, gx1: number, gy1: number, fill: string | CanvasPattern, edge?: string): void {
+  private groundRect(ctx: CanvasRenderingContext2D, gx0: number, gy0: number, gx1: number, gy1: number, fill: string | CanvasPattern): void {
     ctx.save();
     ctx.transform(1, 0.5, -1, 0.5, 0, 0);
     ctx.fillStyle = fill;
     ctx.fillRect(gx0 * G, gy0 * G, (gx1 - gx0) * G, (gy1 - gy0) * G);
-    if (edge) {
-      ctx.strokeStyle = edge;
-      ctx.lineWidth = 9;
-      ctx.filter = 'blur(5px)';
-      ctx.strokeRect(gx0 * G, gy0 * G, (gx1 - gx0) * G, (gy1 - gy0) * G);
-      ctx.filter = 'none';
-    }
     ctx.restore();
+  }
+
+  /**
+   * The ground (grass, roads, plaza, soft shadows) painted at screen size. It only
+   * changes when the camera moves or a building appears, so an idle frame reuses
+   * it with a single unscaled copy instead of repainting the textured plane.
+   */
+  private groundFrame(view: [number, number, number, number, number, number]): HTMLCanvasElement {
+    const c = (this.groundCanvas ??= document.createElement('canvas'));
+    const shadows = this.shadowLayer();
+    const ready = this.pattern('bg_world') && this.pattern('tex_dirt') && this.pattern('tex_cobble');
+    const key = `${view.join(',')}|${this.canvas.width}x${this.canvas.height}|${shadows.key}|${ready ? 1 : 0}`;
+    if (key === this.groundKey) return c;
+    this.groundKey = key;
+    if (c.width !== this.canvas.width || c.height !== this.canvas.height) {
+      c.width = this.canvas.width;
+      c.height = this.canvas.height;
+    }
+    const g = c.getContext('2d')!;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.fillStyle = '#2f4a22';
+    g.fillRect(0, 0, c.width, c.height);
+    g.setTransform(...view);
+    g.imageSmoothingQuality = 'medium';
+    this.drawGround(g);
+    return c;
   }
 
   private drawGround(ctx: CanvasRenderingContext2D): void {
@@ -344,23 +366,59 @@ export class CityView {
     if (grass) this.groundRect(ctx, -14, -14, CITY_GRID + 14, CITY_GRID + 14, grass);
     // warmer, tended grass inside the walls
     this.groundRect(ctx, WALL_MIN, WALL_MIN, WALL_MAX, WALL_MAX, 'rgba(214,226,120,0.10)');
-
     const dirt = this.pattern('tex_dirt');
     const cobble = this.pattern('tex_cobble');
-    for (const [x0, y0, x1, y1] of ROADS) this.groundRect(ctx, x0, y0, x1, y1, dirt ?? '#a98654', 'rgba(52,36,14,0.55)');
-    this.groundRect(ctx, ...PLAZA, cobble ?? '#a99d88', 'rgba(40,32,24,0.6)');
+    for (const [x0, y0, x1, y1] of ROADS) this.groundRect(ctx, x0, y0, x1, y1, dirt ?? '#a98654');
+    this.groundRect(ctx, ...PLAZA, cobble ?? '#a99d88');
+    const sh = this.shadowLayer();
+    ctx.drawImage(sh.canvas, sh.x, sh.y, sh.canvas.width / SHADOW_SCALE, sh.canvas.height / SHADOW_SCALE);
+  }
 
-    // soft contact shadows so buildings sit in the ground
-    ctx.save();
-    ctx.transform(1, 0.5, -1, 0.5, 0, 0);
-    ctx.filter = 'blur(10px)';
-    ctx.fillStyle = 'rgba(30,24,10,0.28)';
+  /**
+   * Soft ink edges along the roads and contact shadows under the buildings. They
+   * need blur filters, which are far too slow to run every frame, so they are
+   * painted once into a half-resolution layer and redrawn only when a building
+   * appears.
+   */
+  private shadowLayer(): { key: string; canvas: HTMLCanvasElement; x: number; y: number } {
+    const s = this.game.state;
+    const key = PLOTS.map((p) => (s.buildings[p.id].level > 0 ? 1 : 0)).join('');
+    if (this.shadows?.key === key) return this.shadows;
+    const pad = 80;
+    const x = -(CITY_GRID + 2) * G - pad;
+    const y = -2 * G - pad;
+    const w = 2 * ((CITY_GRID + 2) * G + pad);
+    const h = (CITY_GRID + 4) * G + pad * 2;
+    const canvas = this.shadows?.canvas ?? document.createElement('canvas');
+    canvas.width = Math.ceil(w * SHADOW_SCALE);
+    canvas.height = Math.ceil(h * SHADOW_SCALE);
+    const g = canvas.getContext('2d')!;
+    g.clearRect(0, 0, canvas.width, canvas.height);
+    g.setTransform(SHADOW_SCALE, 0, 0, SHADOW_SCALE, -x * SHADOW_SCALE, -y * SHADOW_SCALE);
+    g.transform(1, 0.5, -1, 0.5, 0, 0);
+    const edge = (r: [number, number, number, number], color: string) => {
+      const [x0, y0, x1, y1] = r;
+      // a later road covers the edges of the ones beneath it, as its paint would
+      g.globalCompositeOperation = 'destination-out';
+      g.fillRect(x0 * G, y0 * G, (x1 - x0) * G, (y1 - y0) * G);
+      g.globalCompositeOperation = 'source-over';
+      g.strokeStyle = color;
+      g.lineWidth = 9;
+      g.filter = 'blur(2.5px)';
+      g.strokeRect(x0 * G, y0 * G, (x1 - x0) * G, (y1 - y0) * G);
+      g.filter = 'none';
+    };
+    for (const r of ROADS) edge(r, 'rgba(52,36,14,0.55)');
+    edge(PLAZA, 'rgba(40,32,24,0.6)');
+    g.filter = 'blur(5px)';
+    g.fillStyle = 'rgba(30,24,10,0.28)';
     for (const p of PLOTS) {
       const size = BUILDINGS[p.type].size;
-      if (this.game.state.buildings[p.id].level > 0) ctx.fillRect((p.gx - 0.1) * G, (p.gy - 0.1) * G, (size + 0.3) * G, (size + 0.3) * G);
+      if (s.buildings[p.id].level > 0) g.fillRect((p.gx - 0.1) * G, (p.gy - 0.1) * G, (size + 0.3) * G, (size + 0.3) * G);
     }
-    ctx.filter = 'none';
-    ctx.restore();
+    g.filter = 'none';
+    this.shadows = { key, canvas, x, y };
+    return this.shadows;
   }
 
   private drawWallSeg(ctx: CanvasRenderingContext2D, seg: { a: [number, number]; b: [number, number]; mirror: boolean }): void {
@@ -622,17 +680,25 @@ export class CityView {
   private drawSky(ctx: CanvasRenderingContext2D, dt: number): void {
     const mist = img('ink/ink_mist');
     if (mist) {
+      // only what the camera can see; mist is drawn twice and covers a lot of screen
+      const cam = this.camera;
+      const vx0 = cam.x - cam.width / 2 / cam.zoom;
+      const vx1 = cam.x + cam.width / 2 / cam.zoom;
+      const vy0 = cam.y - cam.height / 2 / cam.zoom;
+      const vy1 = cam.y + cam.height / 2 / cam.zoom;
+      // the ground shadow is a pre-darkened copy: a multiply blend per frame costs far more
+      const shade = bakedSprite('ink/ink_mist', 'brightness(0.35)', 0);
+      // soft and drawn enlarged: plain bilinear sampling looks the same and costs far less
+      ctx.imageSmoothingQuality = 'low';
       for (const m of this.mists) {
         m.x += dt * m.v;
         if (m.x > 2800) m.x = -2800;
         const w = 900 * m.s;
         const h = (w * mist.naturalHeight) / mist.naturalWidth;
+        if (m.x + w / 2 + 160 < vx0 || m.x - w / 2 > vx1 || m.y + h + 420 < vy0 || m.y > vy1) continue;
         // shadow on the ground
-        ctx.save();
-        ctx.globalCompositeOperation = 'multiply';
-        ctx.globalAlpha = 0.16;
-        ctx.drawImage(mist, m.x - w / 2 + 160, m.y + 420, w, h);
-        ctx.restore();
+        ctx.globalAlpha = 0.09;
+        if (shade) ctx.drawImage(shade, m.x - w / 2 + 160, m.y + 420, w, h);
         ctx.globalAlpha = 0.2;
         ctx.drawImage(mist, m.x - w / 2, m.y, w, h);
         ctx.globalAlpha = 1;
@@ -647,10 +713,9 @@ export class CityView {
       B.y -= dt * 0.05;
       const flap = 1 + Math.sin(this.time / 90) * 0.06;
       ctx.save();
+      const shadow = bakedSprite('ink/birds', 'blur(6px) brightness(0)', 16);
       ctx.globalAlpha = 0.18;
-      ctx.filter = 'blur(3px) brightness(0)';
-      ctx.drawImage(birds, B.x + 140, B.y + 380, 150, 150);
-      ctx.filter = 'none';
+      if (shadow) drawBaked(ctx, shadow, 16, B.x + 140, B.y + 380, 150);
       ctx.globalAlpha = 1;
       ctx.translate(B.x + 75, B.y + 75);
       ctx.scale(flap, 1 / flap);

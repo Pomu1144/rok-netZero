@@ -233,28 +233,77 @@ export class Fx {
   }
 }
 
-/** Build a seamless pattern from a texture by mirroring it into a 2x2 tile. */
-export function mirroredPattern(ctx: CanvasRenderingContext2D, name: string, tint?: string): CanvasPattern | null {
+type Baked = HTMLCanvasElement | ImageBitmap;
+const baked = new Map<string, Baked | null>();
+
+/**
+ * A sprite with a canvas filter (glow, blur, silhouette) applied once and kept.
+ * Filters are among the slowest canvas operations, so frames draw the baked copy.
+ * `pad` is the margin, in source pixels, the filter may spill into. The copy is
+ * handed over as an ImageBitmap once ready: scaled draws from a bitmap are much
+ * cheaper than from a canvas.
+ */
+export function bakedSprite(name: string, filter: string, pad: number): Baked | null {
+  const key = `${name}|${filter}`;
+  if (baked.has(key)) return baked.get(key)!;
   const im = img(name);
   if (!im) return null;
-  const w = im.naturalWidth;
-  const h = im.naturalHeight;
   const c = document.createElement('canvas');
-  c.width = w * 2;
-  c.height = h * 2;
+  c.width = im.naturalWidth + pad * 2;
+  c.height = im.naturalHeight + pad * 2;
   const g = c.getContext('2d')!;
-  for (let i = 0; i < 4; i++) {
-    g.save();
-    const fx = i % 2 === 1;
-    const fy = i >= 2;
-    g.translate(fx ? w * 2 : 0, fy ? h * 2 : 0);
-    g.scale(fx ? -1 : 1, fy ? -1 : 1);
-    g.drawImage(im, 0, 0);
-    g.restore();
-  }
-  if (tint) {
-    g.fillStyle = tint;
-    g.fillRect(0, 0, c.width, c.height);
+  g.filter = filter;
+  g.drawImage(im, pad, pad);
+  baked.set(key, c);
+  if (typeof createImageBitmap === 'function')
+    createImageBitmap(c).then(
+      (b) => baked.set(key, b),
+      () => {
+        /* keep drawing the canvas */
+      },
+    );
+  return c;
+}
+
+/** Draw a baked sprite where its source image would sit at (x, y), w wide (height follows). */
+export function drawBaked(ctx: CanvasRenderingContext2D, c: Baked, pad: number, x: number, y: number, w: number): void {
+  const k = w / (c.width - pad * 2);
+  ctx.drawImage(c, x - pad * k, y - pad * k, c.width * k, c.height * k);
+}
+
+const mirrors = new Map<string, HTMLCanvasElement>();
+
+/**
+ * Build a seamless pattern from a texture by mirroring it into a 2x2 tile. The
+ * tile is shared between views (a pattern itself belongs to one context), so a
+ * texture is held in memory once.
+ */
+export function mirroredPattern(ctx: CanvasRenderingContext2D, name: string, tint?: string): CanvasPattern | null {
+  const key = `${name}|${tint ?? ''}`;
+  let c = mirrors.get(key);
+  if (!c) {
+    const im = img(name);
+    if (!im) return null;
+    const w = im.naturalWidth;
+    const h = im.naturalHeight;
+    c = document.createElement('canvas');
+    c.width = w * 2;
+    c.height = h * 2;
+    const g = c.getContext('2d')!;
+    for (let i = 0; i < 4; i++) {
+      g.save();
+      const fx = i % 2 === 1;
+      const fy = i >= 2;
+      g.translate(fx ? w * 2 : 0, fy ? h * 2 : 0);
+      g.scale(fx ? -1 : 1, fy ? -1 : 1);
+      g.drawImage(im, 0, 0);
+      g.restore();
+    }
+    if (tint) {
+      g.fillStyle = tint;
+      g.fillRect(0, 0, c.width, c.height);
+    }
+    mirrors.set(key, c);
   }
   return ctx.createPattern(c, 'repeat');
 }

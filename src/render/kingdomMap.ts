@@ -27,12 +27,35 @@ const REGIONS: { name: string; x: number; y: number }[] = [
 
 const NODE_COLOR: Record<string, string> = { food: '#c79a2b', wood: '#5d7d3a', stone: '#7b7468', gold: '#d4a017' };
 
+const seals = new Map<string, HTMLCanvasElement>();
+const SEAL_RES = 3;
+
+/** A stamped seal, painted once per look (its drop shadow is the costly part) and then reused. */
 function seal(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, glyph: string, fill: string, ring: string, text = '#fff3e6'): void {
+  const key = `${r}|${glyph}|${fill}|${ring}|${text}`;
+  let c = seals.get(key);
+  const pad = r + 10;
+  if (!c) {
+    c = document.createElement('canvas');
+    c.width = c.height = Math.ceil(pad * 2 * SEAL_RES);
+    const g = c.getContext('2d')!;
+    g.scale(SEAL_RES, SEAL_RES);
+    paintSeal(g, pad, pad, r, glyph, fill, ring, text);
+    // the glyph font may still be loading; repaint the seal once it is ready
+    if (document.fonts?.status === 'loading') void document.fonts.ready.then(() => seals.delete(key));
+    seals.set(key, c);
+  }
+  ctx.drawImage(c, x - pad, y - pad, pad * 2, pad * 2);
+}
+
+function paintSeal(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, glyph: string, fill: string, ring: string, text: string): void {
   ctx.save();
   ctx.translate(x, y);
+  // shadows ignore the transform, so scale them to the canvas resolution
+  const k = ctx.getTransform().a;
   ctx.shadowColor = 'rgba(0,0,0,0.45)';
-  ctx.shadowBlur = 6;
-  ctx.shadowOffsetY = 2;
+  ctx.shadowBlur = 6 * k;
+  ctx.shadowOffsetY = 2 * k;
   ctx.fillStyle = fill;
   ctx.beginPath();
   // a slightly irregular stamped square, like a carved seal

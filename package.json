@@ -16,7 +16,8 @@
     "audio": "node tools/compose.mjs",
     "assets": "npx @capacitor/assets generate --iconBackgroundColor '#efe6cf' --splashBackgroundColor '#0b0b0c' --splashBackgroundColorDark '#0b0b0c'",
     "i18n": "vite build && node tools/i18n-crawl.mjs && node tools/i18n-data.mjs",
-    "screenshots": "node tools/screenshots.mjs"
+    "screenshots": "node tools/screenshots.mjs",
+    "perf": "vite build && node tools/perf.mjs"
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.2",

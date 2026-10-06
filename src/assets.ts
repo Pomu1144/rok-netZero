@@ -33,22 +33,43 @@ export function img(name: string): HTMLImageElement | undefined {
   return i && i.complete && i.naturalWidth > 0 ? i : undefined;
 }
 
-export function loadAssets(onProgress: (p: number) => void): Promise<void> {
+function loadOne(n: string): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const i = new Image();
+    i.decoding = 'async';
+    i.onload = i.onerror = () => resolve();
+    i.src = assetUrl(n);
+    images.set(n, i);
+  });
+}
+
+/** Art that only some saves show at once: upgraded building tiers, troop tiers and the kingdom map. */
+export function deferrable(name: string): boolean {
+  return /_t[23]$/.test(name) || /^unit_[a-z]+_\d$/.test(name) || name === 'ink/kingdom_map';
+}
+
+/**
+ * Load the art. The returned promise waits only for what the first screen needs
+ * (`needed` says which deferrable sprites the current save shows); the rest
+ * streams in a few at a time afterwards, and renderers fall back to base art
+ * until it lands. Keeps cold start short and decoded texture memory low.
+ */
+export function loadAssets(onProgress: (p: number) => void, needed: (name: string) => boolean = () => true): Promise<void> {
+  const first = ALL.filter((n) => !deferrable(n) || needed(n));
+  const later = ALL.filter((n) => !first.includes(n));
   let done = 0;
   return Promise.all(
-    ALL.map(
-      (n) =>
-        new Promise<void>((resolve) => {
-          const i = new Image();
-          i.decoding = 'async';
-          i.onload = i.onerror = () => {
-            done++;
-            onProgress(done / ALL.length);
-            resolve();
-          };
-          i.src = assetUrl(n);
-          images.set(n, i);
-        }),
+    first.map((n) =>
+      loadOne(n).then(() => {
+        done++;
+        onProgress(done / first.length);
+      }),
     ),
-  ).then(() => undefined);
+  ).then(() => {
+    const next = (): void => {
+      const batch = later.splice(0, 4);
+      if (batch.length) void Promise.all(batch.map(loadOne)).then(() => setTimeout(next, 30));
+    };
+    setTimeout(next, 400);
+  });
 }

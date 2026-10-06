@@ -182,6 +182,8 @@ export interface GameState {
   login?: { claimed: number; last: string; cycles: number };
   /** honours: tiers claimed per achievement id (see achievements.ts) */
   achievements?: Record<string, number>;
+  /** campaign progress: best stars per stage id */
+  campaign?: { stars: Record<string, number> };
   /** current barbarian hunt season */
   hunt?: HuntState;
   /** membership of the AI alliance (see alliance.ts) */

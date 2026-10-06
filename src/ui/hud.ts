@@ -34,6 +34,7 @@ const NAV: [string, InkIcon, string][] = [
   ['commanders', 'i_helmet', 'Generals'],
   ['research', 'i_research', 'Academy'],
   ['bag', 'i_bag', 'Satchel'],
+  ['campaign', 'i_swords', 'Campaign'],
   ['quests', 'i_scroll', 'Decrees'],
   ['alliance', 'i_banner', 'Alliance'],
   ['mail', 'i_mail', 'Reports'],

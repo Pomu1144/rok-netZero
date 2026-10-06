@@ -40,6 +40,7 @@ import { openCalendar, openDaily } from './ui/panels/daily';
 import { openAway, openHonours } from './ui/panels/honours';
 import { openAlliance } from './ui/panels/alliance';
 import { openHunt } from './ui/panels/hunt';
+import { openCampaign } from './ui/panels/campaign';
 import { rollHunt, seasonEnd } from './game/hunt';
 import { askHelp } from './game/alliance';
 import { awaySnapshot, awaySummary, awayWorthShowing, type AwaySummary } from './game/away';
@@ -363,6 +364,7 @@ const hud = new Hud(ctx, {
     if (id === 'honours') openHonours(ctx);
     if (id === 'alliance') openAlliance(ctx);
     if (id === 'hunt') openHunt(ctx);
+    if (id === 'campaign') openCampaign(ctx);
   },
   openJob: (jobId) => openSpeedup(ctx, jobId),
   askHelp: (jobId) => {

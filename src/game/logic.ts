@@ -707,7 +707,7 @@ function startReturn(s: GameState, m: March, fromX: number, fromY: number, at: n
   m.arriveAt = at + Math.max(1, d / speed) * 1000;
 }
 
-function addReport(s: GameState, r: Omit<Report, 'id' | 'read' | 'at'>): Report {
+export function addReport(s: GameState, r: Omit<Report, 'id' | 'read' | 'at'>): Report {
   const rep: Report = { ...r, id: uid(s, 'r'), at: s.time, read: false };
   s.reports.unshift(rep);
   if (s.reports.length > 60) s.reports.length = 60;
@@ -718,7 +718,7 @@ function commanderName(id: string | null): string {
   return id ? COMMANDER_BY_ID[id].name : 'Garrison';
 }
 
-function battleBody(res: BattleResult, aName: string, dName: string, aPortrait?: string, dPortrait?: string): ReportBody {
+export function battleBody(res: BattleResult, aName: string, dName: string, aPortrait?: string, dPortrait?: string): ReportBody {
   return {
     lines: [...res.events.slice(0, 12)],
     attacker: { name: aName, portrait: aPortrait, ...res.attacker },

@@ -43,7 +43,7 @@ Legend: `[x]` done · `[ ]` to do · **(you)** needs the owner (accounts, signin
 - [x] Localisation: English, Spanish, Japanese, Simplified Chinese
 - [x] Performance budget: 60 fps on iPhone 11, texture memory under 300 MB, cold start under 3 s (measured at iPhone 11 size in headless Chromium with `npm run perf`; art budget enforced by `tests/budget.test.ts`)
 - [x] Crash safety: save versioning and migrations, error boundary with recovery
-- [ ] Final store screenshots and preview video
+- [x] Final store screenshots and preview video
 
 ## Owner tasks **(you)**
 

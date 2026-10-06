@@ -2,16 +2,18 @@
 /**
  * Store screenshot generator.
  *
- * Builds the game, serves it, seeds a rich mid-game kingdom and captures captioned
- * marketing shots at the exact pixel sizes the App Store and Google Play require.
+ * Builds the game, serves it, seeds a rich late-game kingdom and captures ten
+ * captioned showcase shots at the exact pixel sizes the App Store and Google Play
+ * require. Every shot is the real game; only the caption band is added.
  *
  *   npm run build && node tools/screenshots.mjs        # -> store/screenshots/<device>/NN-name.jpg
  *
  * Uses Playwright's Chromium (set PLAYWRIGHT_PATH if it is not in node_modules).
  */
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { preview } from 'vite';
+import { caption, enterKingdom, fightBarbarians, releaseCutIn, seedAndSettle, waitForCutIn, watchBattle } from './store-scenes.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_PATH ?? 'playwright');
@@ -28,145 +30,138 @@ const DEVICES = [
 
 const SCENES = [
   { id: '01-title', caption: '' },
-  { id: '02-city', caption: 'Raise a kingdom from the wilds' },
-  { id: '03-generals', caption: 'Lead legendary generals' },
-  { id: '04-war', caption: 'March to war across the realm' },
-  { id: '05-victory', caption: 'Every battle, recorded in ink' },
-  { id: '06-academy', caption: 'Master the arts of war and peace' },
+  { id: '02-city', caption: 'Raise a kingdom from timber to gold' },
+  { id: '03-battle', caption: 'Command battles painted in ink' },
+  { id: '04-generals', caption: 'Lead legendary generals' },
+  { id: '05-talents', caption: "Shape every general's talents" },
+  { id: '06-war', caption: 'March to war across the realm' },
+  { id: '07-kingdom', caption: 'Rule a realm of rivals and holy sites' },
+  { id: '08-campaign', caption: 'Conquer a story campaign' },
+  { id: '09-alliance', caption: 'Rise together with your alliance' },
+  { id: '10-hunt', caption: 'Hunt barbarians, top the leaderboard' },
 ];
 
-/** A believable mid-game kingdom for marketing shots. */
-function seedKingdom() {
-  const g = window.__game;
-  const s = g.state;
-  s.tutorialDone = true;
-  s.governor = 'Aurelian';
-  const lv = { city_hall: 9, wall: 8, barracks: 9, archery_range: 8, stable: 7, siege_workshop: 6, academy: 8, hospital: 7, tavern: 6, scout_camp: 5, storehouse: 6, farm_1: 9, farm_2: 8, farm_3: 6, lumber_mill_1: 9, lumber_mill_2: 7, quarry_1: 7, gold_mine_1: 5, quarry_2: 4 };
-  for (const id in lv) s.buildings[id].level = lv[id];
-  for (const id in s.buildings) s.buildings[id].collectedAt = s.time - 3 * 3600_000;
-  s.res = { food: 1_284_000, wood: 963_000, stone: 412_000, gold: 186_000 };
-  s.gems = 2480;
-  s.troops = { infantry_1: 4200, infantry_2: 3100, archer_1: 2600, archer_2: 1800, cavalry_1: 2200, cavalry_2: 900, siege_1: 600 };
-  for (const id of ['caesar', 'joan', 'khan', 'cleopatra']) s.commanders[id].unlocked = true;
-  Object.assign(s.commanders.caesar, { level: 27, stars: 3, skills: [3, 2, 2, 1], sculptures: 34 });
-  Object.assign(s.commanders.suntzu, { level: 22, stars: 3, skills: [3, 2, 1, 1] });
-  Object.assign(s.commanders.boudica, { level: 18, stars: 2, skills: [2, 2, 1, 0] });
-  Object.assign(s.commanders.joan, { level: 14, stars: 2, skills: [2, 1, 0, 0] });
-  s.research = { irrigation: 5, handsaw: 5, masonry: 4, wheel: 3, quarrying: 3, writing: 2, discipline: 5, archery: 4, ironworking: 4, horsemanship: 3, conscription: 2, healing: 2 };
-  s.stats.maxBarbLevel = 6;
-  s.questsClaimed = ['q_collect', 'q_ch2', 'q_barb1', 'q_archery', 'q_train100', 'q_wall2', 'q_ch3', 'q_tavern', 'q_academy', 'q_research', 'q_gather', 'q_barb3', 'q_ch4', 'q_quarry'];
-  s.jobs = [];
-  g.emitChange();
-}
-
-async function caption(page, text, bottom = false) {
-  await page.evaluate(([t, low]) => {
-    document.querySelector('.shot-caption')?.remove();
-    if (!document.querySelector('#shot-style')) {
-      const st = document.createElement('style');
-      st.id = 'shot-style';
-      st.textContent = '#toasts, .queues, .quest-slip { display: none !important; }';
-      document.head.appendChild(st);
-    }
-    if (!t) return;
-    const el = document.createElement('div');
-    el.className = 'shot-caption';
-    el.textContent = t;
-    Object.assign(el.style, {
-      position: 'fixed', left: '50%', transform: 'translateX(-50%)', zIndex: 200,
-      ...(low ? { bottom: '10px' } : { top: '10px' }),
-      padding: '14px 56px', font: "700 20px 'Kaisei Tokumin', serif", letterSpacing: '0.1em', color: '#fff7e2', whiteSpace: 'nowrap',
-      background: "url(./assets/ink/ink_band.webp) center / 100% 100% no-repeat", filter: 'drop-shadow(0 8px 14px rgba(0,0,0,.6))',
-    });
-    document.body.appendChild(el);
-  }, [text, bottom]);
-}
+const jpg = (page, dir, id) => page.screenshot({ path: `${dir}${id}.jpg`, type: 'jpeg', quality: 90 });
 
 async function shoot(browser, base, dev) {
   const dir = `${OUT}${dev.name}/`;
+  rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   const page = await browser.newPage({ viewport: { width: dev.w, height: dev.h }, deviceScaleFactor: dev.scale, hasTouch: true });
-  await page.goto(base);
-  await page.evaluate(() => localStorage.clear());
-  await page.reload();
-  await page.waitForSelector('.t-enter:not(.hidden)', { timeout: 30000 });
+  const cap = (i) => caption(page, SCENES[i].caption);
+
+  await enterKingdom(page, base);
   await page.waitForTimeout(2200);
-  await page.screenshot({ path: `${dir}01-title.jpg`, type: 'jpeg', quality: 90 });
+  await jpg(page, dir, SCENES[0].id);
 
   await page.click('.t-enter', { force: true });
   await page.waitForTimeout(1200);
-  await page.evaluate(() => window.__closeAll());
-  await page.evaluate(seedKingdom);
-  await page.waitForTimeout(1500);
-  await page.evaluate(() => window.__closeAll());
+  await seedAndSettle(page);
   await page.evaluate(() => {
+    // frame the palace and the inner city
     const cam = window.__city.camera;
-    cam.zoom = 0.55;
+    cam.x = -150;
+    cam.y = 880;
+    cam.zoom = 0.62;
   });
-  await page.waitForTimeout(1200);
-  await caption(page, SCENES[1].caption);
-  await page.screenshot({ path: `${dir}02-city.jpg`, type: 'jpeg', quality: 90 });
+  await page.waitForTimeout(2500); // upgraded tiers stream in after the title
+  await cap(1);
+  await jpg(page, dir, SCENES[1].id);
 
-  await caption(page, SCENES[2].caption, true);
+  // a real battle, replayed at the moment a commander's skill cuts in
+  await caption(page, '');
+  await fightBarbarians(page);
+  await watchBattle(page);
+  await cap(2);
+  await waitForCutIn(page);
+  await page.waitForTimeout(150);
+  await jpg(page, dir, SCENES[2].id);
+  await releaseCutIn(page);
+  await caption(page, '');
+  await page.waitForFunction(() => document.querySelector('.bs-end.show'), null, { timeout: 30000 }).catch(() => {});
+  await page.click('[data-role=done]').catch(() => {});
+  await page.evaluate(() => window.__closeAll());
+  await page.waitForTimeout(400);
+
   await page.evaluate(() => window.__openCommander('caesar'));
   await page.waitForTimeout(1300);
-  await page.screenshot({ path: `${dir}03-generals.jpg`, type: 'jpeg', quality: 90 });
+  await cap(3);
+  await jpg(page, dir, SCENES[3].id);
+  await page.click('[data-act=talents]');
+  await page.waitForTimeout(1100);
+  await cap(4);
+  await jpg(page, dir, SCENES[4].id);
+  await caption(page, '');
   await page.evaluate(() => window.__closeAll());
   await page.waitForTimeout(300);
 
-  // war: march at a barbarian and catch the clash
+  // war: marches in flight across the realm
   await page.evaluate(() => window.__ctx.goWorld());
   await page.waitForTimeout(1200);
-  const target = await page.evaluate(() => {
+  await page.evaluate(() => {
     const s = window.__game.state;
-    const b = s.world.filter((o) => o.kind === 'barbarian' && o.level <= 4).sort((a, b) => Math.hypot(a.x - 60, a.y - 60) - Math.hypot(b.x - 60, b.y - 60))[0];
-    return b.id;
+    const near = (kind, max) =>
+      s.world.filter((o) => o.kind === kind && (max ? o.level <= max : true)).sort((a, b) => Math.hypot(a.x - 60, a.y - 60) - Math.hypot(b.x - 60, b.y - 60))[0];
+    const send = (o) => window.__ctx.run((st) => window.__send(st, o));
+    send({ kind: 'attack', targetId: near('barbarian', 6).id, commanderId: 'suntzu', troops: { archer_3: 3000, infantry_3: 2000 } });
+    send({ kind: 'gather', targetId: near('node').id, commanderId: 'cleopatra', troops: { infantry_3: 2000 } });
+    send({ kind: 'attack', targetId: near('fort').id, commanderId: 'boudica', troops: { cavalry_3: 2400, infantry_3: 2000 } });
   });
-  await page.evaluate((id) => {
-    const g = window.__game;
-    const send = (cmd, troops, tid) => window.__ctx.run((s) => window.__send(s, { kind: 'attack', targetId: tid, commanderId: cmd, troops }));
-    send('caesar', { infantry_2: 2400, archer_2: 800 }, id);
-    const node = g.state.world.find((o) => o.kind === 'node' && Math.hypot(o.x - 60, o.y - 60) < 12);
-    if (node) window.__ctx.run((s) => window.__send(s, { kind: 'gather', targetId: node.id, commanderId: 'cleopatra', troops: { infantry_1: 1500 } }));
-  }, target);
   await page.waitForTimeout(400);
   await page.evaluate(() => {
     const m = window.__game.state.marches[0];
     window.__world.goTo((m.fromX + m.toX) / 2, (m.fromY + m.toY) / 2 + 1);
-    window.__world.camera.zoom = 0.85;
+    window.__world.camera.zoom = 0.75;
   });
-  await page.waitForTimeout(900);
-  await caption(page, SCENES[3].caption);
-  await page.screenshot({ path: `${dir}04-war.jpg`, type: 'jpeg', quality: 90 });
+  await page.waitForTimeout(1500);
+  await cap(5);
+  await jpg(page, dir, SCENES[5].id);
 
-  // fast-forward to the battle and open its report
-  await page.evaluate(() => {
-    window.__game.state.speed = 40;
-  });
-  await page.waitForFunction(() => window.__game.state.reports.some((r) => r.kind === 'battle'), null, { timeout: 30000 });
-  await page.evaluate(() => {
-    window.__game.state.speed = 1;
-  });
+  await caption(page, '');
+  await page.click('[data-kingdom]');
+  await page.waitForTimeout(2600);
+  await cap(6);
+  await jpg(page, dir, SCENES[6].id);
+  await caption(page, '');
+  await page.evaluate(() => window.__ctx.goCity());
   await page.waitForTimeout(600);
-  await caption(page, SCENES[4].caption, true);
-  await page.evaluate(() => window.__ctx.openReport(window.__game.state.reports.find((r) => r.kind === 'battle').id));
-  await page.waitForTimeout(1400);
-  await page.screenshot({ path: `${dir}05-victory.jpg`, type: 'jpeg', quality: 90 });
+
+  await page.evaluate(() => document.querySelector('[data-nav=campaign]').click());
+  await page.waitForTimeout(1300);
+  await cap(7);
+  await jpg(page, dir, SCENES[7].id);
+  await caption(page, '');
   await page.evaluate(() => window.__closeAll());
   await page.waitForTimeout(300);
 
-  await caption(page, SCENES[5].caption, true);
-  await page.evaluate(() => document.querySelector('[data-nav=research]').click());
+  await page.evaluate(() => document.querySelector('[data-nav=alliance]').click());
+  await page.waitForTimeout(800);
+  await page.click('[data-act=join]').catch(() => {});
+  await page.waitForTimeout(1500);
+  await cap(8);
+  await jpg(page, dir, SCENES[8].id);
+  await caption(page, '');
+  await page.evaluate(() => window.__closeAll());
+  await page.waitForTimeout(300);
+
+  await page.evaluate(() => {
+    window.__game.state.stats.huntPoints = 1840;
+    window.__game.emitChange();
+  });
+  await page.evaluate(() => document.querySelector('[data-nav=hunt]').click());
   await page.waitForTimeout(1300);
-  await page.screenshot({ path: `${dir}06-academy.jpg`, type: 'jpeg', quality: 90 });
+  await cap(9);
+  await jpg(page, dir, SCENES[9].id);
   await page.close();
 }
 
 const server = await preview({ preview: { port: 4321, strictPort: true }, logLevel: 'silent' });
 const base = 'http://localhost:4321/';
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
+const only = process.env.DEVICE;
 try {
   for (const dev of DEVICES) {
+    if (only && dev.name !== only) continue;
     process.stdout.write(`${dev.name} (${dev.w * dev.scale}x${dev.h * dev.scale})… `);
     await shoot(browser, base, dev);
     console.log('done');

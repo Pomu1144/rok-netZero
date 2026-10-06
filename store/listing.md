@@ -63,4 +63,4 @@ The game is fully offline and needs no login. To see late-game content quickly, 
 **Content rating** (IARC): expect PEGI 7 / ESRB Everyone 10+ (mild fantasy violence)
 **Data safety**: No data collected, no data shared.
 **Ads**: No · **In-app purchases**: No
-**Graphics**: icon `store/art/play_icon_512.png`, feature graphic `store/art/play_feature_graphic.png`, phone screenshots `store/screenshots/android-phone/`
+**Graphics**: icon `store/art/play_icon_512.png`, feature graphic `store/art/play_feature_graphic.png`, phone screenshots `store/screenshots/android-phone/`, promo video `store/preview/play.mp4` (upload to YouTube and link it)

@@ -66,6 +66,21 @@ Progress saves to `localStorage`. Offline time (up to 8 h) is applied when you r
 
 Fonts (Cinzel and Kaisei Tokumin, SIL OFL) are self-hosted and subset in `public/fonts/`.
 
+## Mobile apps
+
+The same bundle ships as native iOS and Android apps through Capacitor (`ios/`, `android/`, app id `com.pomu.realmofkings`). It also installs as an offline web app (`public/manifest.webmanifest`, `public/sw.js`).
+
+- Saves are mirrored into native Preferences, so iOS storage eviction cannot wipe a kingdom. You can also copy a save code from Settings and restore it on another device.
+- When the app goes to the background it schedules local reminders (builds, training, research, raids, free chests). On return it applies the time you were away.
+- Haptics fire on taps, level-ups, battles and raid warnings, and the layout respects notches and home indicators.
+- `npm run ios` / `npm run android` build, sync and open the native IDE.
+- `store/README.md` is the step-by-step guide to App Store and Play submission. Listing copy, age rating and privacy answers are in `store/listing.md`, and screenshots are in `store/screenshots/`.
+- CI (`.github/workflows/ci.yml`) runs tests and the web build, assembles an Android debug APK, and builds the iOS app for the simulator on every PR.
+
+## Sound
+
+`tools/compose.mjs` writes an original soundtrack and sampled effects to `public/audio/`. It synthesises them from scratch (Karplus-Strong koto, bamboo flute, string pad, taiko, gong, horn, Freeverb reverb) and folds each loop's reverb tail back so the loops are seamless. Run `npm run audio` to re-render.
+
 ## Code layout
 
 | Path | Purpose |

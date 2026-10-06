@@ -1,6 +1,6 @@
 import './style.css';
 import { assetUrl, loadAssets } from './assets';
-import { setMuted, sfx } from './audio';
+import { playMusic, setMuted, setMusic, sfx, unlockAudio } from './audio';
 import { BUILDINGS } from './data/buildings';
 import { COMMANDER_BY_ID } from './data/commanders';
 import { PLOT_BY_ID } from './data/layout';
@@ -18,6 +18,7 @@ import {
   objSprite,
   plotUnlockLevel,
   recallMarch,
+  sendMarch,
   storedAmount,
   type GameEvent,
   type Result,
@@ -27,16 +28,21 @@ import { PLAYER_POS, sumTroops } from './game/state';
 import { CityView } from './render/cityView';
 import { T, WorldView } from './render/worldView';
 import type { UiCtx } from './ui/ctx';
-import { $, anyModalOpen, closeAllModals, flyTo, onAct, refreshLiveModals, setClock, toast, updateTimers } from './ui/dom';
+import { $, anyModalOpen, closeAllModals, closeTopModal, flyTo, onAct, refreshLiveModals, setClock, toast, updateTimers } from './ui/dom';
 import { esc, fmt, fmtFull } from './ui/format';
 import { Hud } from './ui/hud';
+import { clearReminders, haptic, initStorage, nativeReady, onAppState, registerServiceWorker, scheduleReminders, setHaptics, type Reminder } from './native';
 import { BUILDING_KANJI, ink, type InkIcon } from './ui/ink';
 import { openCommander, openCommanders, openMarch, openTavern } from './ui/panels/army';
 import { openBuilding, openHospital, openResearch, openSpeedup, openTrain } from './ui/panels/city';
 import { openAdvisor, openBag, openMail, openProfile, openQuests, openSettings, questGo } from './ui/panels/misc';
 
+registerServiceWorker();
+await initStorage();
 const game = new Game();
 setMuted(game.state.muted);
+setMusic(!game.state.musicOff);
+setHaptics(!game.state.hapticsOff);
 setClock(() => game.state.time);
 
 const cityCanvas = $('#city-canvas') as HTMLCanvasElement;
@@ -63,7 +69,8 @@ function switchView(to: 'city' | 'world', after?: () => void): void {
   tr.classList.remove('out');
   void tr.offsetWidth;
   tr.classList.add('in');
-  sfx.open();
+  sfx.brush();
+  void playMusic(to === 'city' ? 'music_city' : 'music_world');
   setTimeout(() => {
     view = to;
     cityCanvas.classList.toggle('hidden', to !== 'city');
@@ -103,6 +110,7 @@ const ctx: UiCtx = {
       return false;
     }
     okSound?.();
+    haptic('tap');
     return true;
   },
   openMarch: (id, kind) => openMarch(ctx, id, kind),
@@ -378,9 +386,13 @@ function onGameEvent(e: GameEvent): void {
   const openReport = e.reportId ? () => openMail(ctx, e.reportId) : undefined;
   switch (e.kind) {
     case 'build':
+      haptic('success');
       sfx.fanfare();
       toast(e.text, 'good', 'ink/i_hammer');
-      if (e.plotId) city.levelUp(e.plotId);
+      if (e.plotId) {
+        city.levelUp(e.plotId);
+        setTimeout(() => sfx.stamp(), 230);
+      }
       break;
     case 'research':
       sfx.fanfare();
@@ -392,7 +404,10 @@ function onGameEvent(e: GameEvent): void {
       toast(e.text, 'good', 'ink/i_spear');
       break;
     case 'battle':
-      sfx.battle();
+      haptic('heavy');
+      if (e.good) sfx.victory();
+      else sfx.defeat();
+      setTimeout(() => sfx.stamp(), 520);
       if (e.x !== undefined && e.y !== undefined) world.battleFx(e.x, e.y, !!e.good);
       toast(e.text, e.good ? 'good' : 'bad', 'ink/i_swords', openReport);
       break;
@@ -401,11 +416,13 @@ function onGameEvent(e: GameEvent): void {
       toast(e.text, 'good', 'ink/i_gather', openReport);
       break;
     case 'raid_warning':
+      haptic('warning');
       sfx.horn();
       toast(e.text, 'bad', 'unit_barbarian');
       break;
     case 'raid':
       sfx.battle();
+      setTimeout(() => (e.good ? sfx.victory() : sfx.defeat()), 900);
       world.battleFx(PLAYER_POS.x, PLAYER_POS.y, !!e.good);
       toast(e.text, e.good ? 'good' : 'bad', 'ink/t_wall', openReport);
       break;
@@ -466,13 +483,16 @@ async function boot(): Promise<void> {
   $('.t-load', title).classList.add('hidden');
   const start = $('.t-enter', title);
   start.classList.remove('hidden');
+  void nativeReady();
   $('.t-enter small', title).textContent = game.state.tutorialDone ? 'Welcome back, Governor' : 'Your realm awaits';
   hud.update();
   requestAnimationFrame(frame);
   start.addEventListener(
     'click',
     () => {
-      sfx.fanfare();
+      unlockAudio();
+      void playMusic('music_city');
+      sfx.stamp();
       title.classList.add('fade');
       setTimeout(() => {
         video.pause();
@@ -492,9 +512,60 @@ async function boot(): Promise<void> {
 }
 
 window.addEventListener('beforeunload', () => game.save());
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) game.save();
-});
+
+/** Turn running timers into device reminders, converting game time to wall-clock time. */
+function reminders(): Reminder[] {
+  const s = game.state;
+  const real = (gameAt: number) => Date.now() + (gameAt - s.time) / s.speed;
+  const out: Reminder[] = [];
+  let id = 1;
+  for (const j of s.jobs) {
+    if (j.kind === 'build') out.push({ id: id++, at: real(j.end), title: 'Construction complete', body: `${BUILDINGS[s.buildings[j.target].type].name} has reached Lv.${j.amount}.` });
+    if (j.kind === 'train') out.push({ id: id++, at: real(j.end), title: 'Troops ready', body: 'Your new soldiers await orders.' });
+    if (j.kind === 'research') out.push({ id: id++, at: real(j.end), title: 'Research complete', body: 'The Academy has new knowledge for you.' });
+    if (j.kind === 'heal') out.push({ id: id++, at: real(j.end), title: 'Wounded healed', body: 'Your soldiers are fit to fight again.' });
+  }
+  for (const m of s.marches) if (m.phase === 'gathering' && m.gatherEnd) out.push({ id: id++, at: real(m.gatherEnd), title: 'Gathering complete', body: 'Your gatherers are heading home.' });
+  if (s.raid) out.push({ id: id++, at: real(s.raid.arriveAt) - 60_000, title: 'Barbarians at the gates!', body: 'A warband reaches your walls within the minute.' });
+  if (s.tavern.silverFreeAt > s.time) out.push({ id: id++, at: real(s.tavern.silverFreeAt), title: 'Free chest', body: 'A free Silver Chest awaits in the Tavern.' });
+  return out;
+}
+
+let pausedAt = 0;
+onAppState(
+  () => {
+    if (pausedAt) return;
+    pausedAt = Date.now();
+    game.save();
+    void scheduleReminders(reminders());
+  },
+  () => {
+    if (!pausedAt) return;
+    const away = Date.now() - pausedAt;
+    pausedAt = 0;
+    void clearReminders();
+    if (away > 2000) {
+      const ev = game.resumeAfter(away);
+      if (ev.length > 2) toast(`While you were away · ${ev.length} events`, 'info');
+    }
+  },
+  () => {
+    if (anyModalOpen()) {
+      closeTopModal();
+      return true;
+    }
+    if (ringPlot || popupObj) {
+      closeRing();
+      closePopup();
+      return true;
+    }
+    if (view === 'world') {
+      ctx.goCity();
+      return true;
+    }
+    return false;
+  },
+);
 window.addEventListener('keydown', (e) => {
   if (anyModalOpen()) return;
   if (e.key === 'm' || e.key === 'M') view === 'city' ? ctx.goWorld() : ctx.goCity();
@@ -503,4 +574,4 @@ window.addEventListener('keydown', (e) => {
 void boot();
 
 // hooks for automated checks
-Object.assign(window, { __game: game, __ctx: ctx, __closeAll: closeAllModals, __openCommander: (id: string) => openCommander(ctx, id) });
+Object.assign(window, { __game: game, __ctx: ctx, __city: city, __world: world, __send: sendMarch, __closeAll: closeAllModals, __openCommander: (id: string) => openCommander(ctx, id) });

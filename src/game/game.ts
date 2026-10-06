@@ -13,7 +13,7 @@ export class Game {
   rng: Rng;
   private listeners = new Set<Listener>();
   private eventListeners = new Set<EventListener>();
-  private lastReal = performance.now();
+  lastReal = performance.now();
   private saveTimer = 0;
   offlineMs = 0;
 
@@ -26,6 +26,18 @@ export class Game {
       this.state = newGame();
     }
     this.rng = new Rng((Date.now() ^ this.state.seed) >>> 0);
+  }
+
+  /** Apply real time that passed while the app was backgrounded (capped like offline time). */
+  resumeAfter(realMs: number): GameEvent[] {
+    this.lastReal = performance.now();
+    this.offlineMs = Math.min(OFFLINE_CAP_MS, Math.max(0, realMs));
+    const events = this.catchUp();
+    if (events.length) {
+      this.emitEvents(events);
+      this.save();
+    }
+    return events;
   }
 
   /** Apply time that passed while the tab was closed. */

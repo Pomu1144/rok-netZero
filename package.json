@@ -1,7 +1,7 @@
 {
   "name": "realm-of-kings",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "Realm of Kings - a browser kingdom-strategy game with AI-generated (Higgsfield) art",
   "scripts": {
@@ -9,11 +9,29 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "cap:sync": "npm run build && cap sync",
+    "ios": "npm run build && cap sync ios && cap open ios",
+    "android": "npm run build && cap sync android && cap open android",
+    "audio": "node tools/compose.mjs",
+    "assets": "npx @capacitor/assets generate --iconBackgroundColor '#efe6cf' --splashBackgroundColor '#0b0b0c' --splashBackgroundColorDark '#0b0b0c'",
+    "screenshots": "node tools/screenshots.mjs"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
     "typescript": "^7.0.2",
     "vite": "^8.3.2",
     "vitest": "^5.0.3"
+  },
+  "dependencies": {
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4"
   }
 }

@@ -115,6 +115,10 @@ export function closeAllModals(): void {
   while (open.length) open[open.length - 1].handle.close();
 }
 
+export function closeTopModal(): void {
+  open[open.length - 1]?.handle.close();
+}
+
 export function anyModalOpen(): boolean {
   return open.length > 0;
 }

@@ -160,6 +160,9 @@ export interface GameState {
   nextId: number;
   tutorialDone: boolean;
   muted: boolean;
+  /** optional so older saves load without a migration */
+  hapticsOff?: boolean;
+  musicOff?: boolean;
 }
 
 export const SAVE_VERSION = 1;
@@ -259,14 +262,22 @@ export function cloneTroops(t: Troops): Troops {
   return out;
 }
 
-const SAVE_KEY = 'realm-of-kings-save';
+export const SAVE_KEY = 'realm-of-kings-save';
+
+/** Native builds mirror every save into durable device storage (see src/native.ts). */
+let saveMirror: ((raw: string) => void) | null = null;
+export function setSaveMirror(fn: (raw: string) => void): void {
+  saveMirror = fn;
+}
 
 export function saveGame(state: GameState): void {
+  const raw = JSON.stringify({ state, savedAt: Date.now() });
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ state, savedAt: Date.now() }));
+    localStorage.setItem(SAVE_KEY, raw);
   } catch {
     /* storage may be unavailable (private mode) — the game still runs */
   }
+  saveMirror?.(raw);
 }
 
 export function loadGame(): { state: GameState; savedAt: number } | null {

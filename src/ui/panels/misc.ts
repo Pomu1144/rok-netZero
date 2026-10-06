@@ -1,5 +1,7 @@
 import { assetUrl } from '../../assets';
-import { setMuted, sfx } from '../../audio';
+import { setMuted, setMusic, sfx } from '../../audio';
+import { persistSave, setHaptics } from '../../native';
+import { SAVE_KEY } from '../../game/state';
 import { COMMANDERS, COMMANDER_BY_ID } from '../../data/commanders';
 import { ITEMS, type ItemId } from '../../data/items';
 import { TROOP_NAMES, TROOP_SPRITES } from '../../data/troops';
@@ -251,10 +253,25 @@ export function openSettings(ctx: UiCtx): void {
         <div class="row" style="flex-wrap:wrap;margin-top:10px">
           ${[1, 5, 20, 60].map((v) => `<button class="btn ${s.speed === v ? 'btn-gold' : ''}" data-act="speed" data-v="${v}">${v}×</button>`).join('')}
         </div>
-        <h3 class="sec">Sound</h3>
-        <button class="btn" data-act="mute">${s.muted ? 'Sound is off' : 'Sound is on'}</button>
+        <h3 class="sec">Sound &amp; feel</h3>
+        <div class="row" style="flex-wrap:wrap">
+          <button class="btn ${s.muted ? '' : 'btn-gold'}" data-act="mute">Sound ${s.muted ? 'off' : 'on'}</button>
+          <button class="btn ${s.musicOff ? '' : 'btn-gold'}" data-act="music">Music ${s.musicOff ? 'off' : 'on'}</button>
+          <button class="btn ${s.hapticsOff ? '' : 'btn-gold'}" data-act="haptics">Vibration ${s.hapticsOff ? 'off' : 'on'}</button>
+        </div>
+        <h3 class="sec">Chronicle backup</h3>
+        <div class="muted">Copy your save to move it to another device, or paste one to restore it.</div>
+        <div class="row" style="flex-wrap:wrap;margin-top:10px">
+          <button class="btn" data-act="export">Copy save</button>
+          <button class="btn" data-act="import">Restore save</button>
+        </div>
         <h3 class="sec">Governor</h3>
         <div class="row"><input type="text" value="${esc(s.governor)}" maxlength="18" data-role="name" style="flex:1;width:auto"><button class="btn" data-act="rename">Rename</button></div>
+        <h3 class="sec">About</h3>
+        <div class="row" style="flex-wrap:wrap">
+          <button class="btn btn-sm" data-act="privacy">Privacy policy</button>
+          <span class="muted">Version 1.0.0 · Art painted with Higgsfield</span>
+        </div>
         <h3 class="sec">Abdicate</h3>
         <button class="btn btn-red" data-act="reset">Found a new kingdom</button>`;
       onAct(body, {
@@ -263,6 +280,47 @@ export function openSettings(ctx: UiCtx): void {
           ctx.game.act((st) => void (st.muted = !st.muted));
           setMuted(ctx.game.state.muted);
         },
+        music: () => {
+          ctx.game.act((st) => void (st.musicOff = !st.musicOff));
+          setMusic(!ctx.game.state.musicOff);
+        },
+        haptics: () => {
+          ctx.game.act((st) => void (st.hapticsOff = !st.hapticsOff));
+          setHaptics(!ctx.game.state.hapticsOff);
+        },
+        export: () => {
+          ctx.game.save();
+          const raw = localStorage.getItem(SAVE_KEY) ?? '';
+          const code = btoa(unescape(encodeURIComponent(raw)));
+          navigator.clipboard?.writeText(code).then(
+            () => toast('Save copied to the clipboard', 'good'),
+            () => prompt('Copy your save code:', code),
+          ) ?? prompt('Copy your save code:', code);
+        },
+        import: () => {
+          const code = prompt('Paste a save code to restore it. Your current kingdom will be replaced.');
+          if (!code) return;
+          try {
+            const raw = decodeURIComponent(escape(atob(code.trim())));
+            const parsed = JSON.parse(raw) as { state?: { version?: number } };
+            if (!parsed.state?.version) throw new Error('bad save');
+            // stamp it as the newest save so device storage doesn't win on reload
+            const fresh = JSON.stringify({ ...(parsed as object), savedAt: Date.now() });
+            localStorage.setItem(SAVE_KEY, fresh);
+            void persistSave(fresh).then(() => location.reload());
+          } catch {
+            toast('That save code could not be read', 'bad');
+          }
+        },
+        privacy: () =>
+          openModal({
+            title: 'Privacy Policy',
+            seal: '書',
+            kicker: 'Court · Privacy',
+            render: (b) => {
+              b.innerHTML = '<iframe src="./privacy.html" title="Privacy policy" style="width:100%;height:62vh;border:0;background:#0b0b0c"></iframe>';
+            },
+          }),
         rename: () => {
           const v = (body.querySelector('[data-role=name]') as HTMLInputElement).value.trim();
           if (v) ctx.game.act((st) => void (st.governor = v.slice(0, 18)));

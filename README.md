@@ -1,6 +1,8 @@
 # Realm of Kings
 
-A browser kingdom-strategy game in the spirit of *Rise of Kingdoms*: build an isometric city, train an army, lead historical commanders and conquer a living world map. All art was generated with **Higgsfield AI** (GPT Image 2.5): 66 painterly sprites, portraits, icons and backgrounds in `public/assets/`.
+A browser kingdom-strategy game in the spirit of *Rise of Kingdoms*: build an isometric city, train an army, lead historical commanders and conquer a living world map. All art was generated with **Higgsfield AI**: painterly sprites, portraits and terrain (GPT Image 2.5), a hand-painted sumi-e UI kit, and an animated title loop (Kling 3.0).
+
+The interface uses the **Ink** style from NXBNVNB: charcoal glass panels, hairline gold frames, Cinzel and Kaisei Tokumin type, cream paper-slip buttons, vermilion seals and dry-brush strokes. Every icon is a painted raster brush mark; the UI contains no emoji and no SVG.
 
 This is an original game. It borrows the genre's mechanics, not its name, art or assets.
 
@@ -50,6 +52,20 @@ Progress saves to `localStorage`. Offline time (up to 8 h) is applied when you r
 - An items bag (speedups, tomes, keys, resource packs).
 - Gem instant-finish, and a free finish for builds under 5 minutes.
 
+## Interface and motion
+
+- **Title:** a looping living painting (the king's cape moving over an ink-wash landscape) with drifting gold leaf, ink mist, a brush-drawn title and a stamped seal.
+- **City ⇄ world:** an ink blot blooms across the screen and dissolves over the other view.
+- **Panels:** sweep open with a brush wipe; the header seal is stamped in; each panel has its own kanji seal (城 city, 将 generals, 学 academy, 戦 march, 書 reports, …).
+- **City:** painted roads and cobbles projected onto the isometric ground, tiled stone wall sprites, chimney smoke, builders' dust, a striking hammer over construction, soldiers walking the roads, swallows and drifting mist.
+- **Feedback:**
+  - Harvested resources fly into the currency strip.
+  - A finished upgrade makes the building bounce, sends out a gold ensō shockwave and stamps 昇.
+  - Battles on the map flash crossed swords, flick vermilion ink and stamp 勝 or 敗.
+  - Toasts arrive as brush bands.
+
+Fonts (Cinzel and Kaisei Tokumin, SIL OFL) are self-hosted and subset in `public/fonts/`.
+
 ## Code layout
 
 | Path | Purpose |
@@ -68,4 +84,6 @@ The assets were made with the Higgsfield MCP `generate_image` tool (model `gpt_i
 
 > AAA mobile strategy game building asset, stylized semi-realistic painterly 3D render, isometric 3/4 view from 45 degrees above, single isolated object centered, transparent background, no text …
 
-The raw PNGs were then trimmed and converted to WebP with ImageMagick. The whole asset set is 3.5 MB.
+The ink kit followed the style block from NXBNVNB's `tools/ui/INK_ASSET_PROMPTS.md` (black sumi-e brushwork on transparency, vermilion `#b8322a` accents). Icons were then recoloured to warm cream for dark panels. The title loop is a Kling 3.0 image-to-video clip whose first and last frames are the same key art, so it loops seamlessly. It ships as WebM (VP9) with an MP4 fallback.
+
+The raw PNGs were trimmed and converted to WebP with ImageMagick. Art, video and fonts total about 6 MB.

@@ -1,14 +1,18 @@
 const NAMES = [
+  // painted world & city sprites
   'city_hall', 'barracks', 'archery_range', 'stable', 'siege_workshop', 'farm', 'lumber_mill', 'quarry', 'gold_mine',
   'academy', 'hospital', 'tavern', 'storehouse', 'scout_camp', 'watchtower', 'fountain', 'scaffold',
   'barb_camp', 'barb_fort', 'node_food', 'node_wood', 'node_stone', 'node_gold', 'city_enemy', 'city_player', 'holy_site',
   'mountain', 'forest', 'lake', 'pass', 'march_token',
   'unit_infantry', 'unit_archer', 'unit_cavalry', 'unit_siege', 'unit_barbarian',
   'cmd_caesar', 'cmd_joan', 'cmd_suntzu', 'cmd_boudica', 'cmd_khan', 'cmd_cleopatra',
-  'bg_world', 'bg_city', 'parchment',
+  'bg_world', 'tex_cobble', 'tex_dirt',
   'ic_food', 'ic_wood', 'ic_stone', 'ic_gold', 'ic_gems', 'ic_ap', 'ic_speedup', 'ic_power', 'ic_chest', 'ic_tome',
-  'ic_key_silver', 'ic_key_gold', 'ic_sculpture', 'ic_build',
-  'nav_commanders', 'nav_bag', 'nav_quests', 'nav_mail', 'nav_research', 'nav_map',
+  'ic_key_silver', 'ic_key_gold', 'ic_sculpture',
+  // ink kit (sumi-e brushwork)
+  'ink/wall_seg', 'ink/ink_mist', 'ink/ink_enso_c', 'ink/ink_enso_gold', 'ink/seal_solid', 'ink/seal_frame',
+  'ink/ink_splat_red', 'ink/ink_blot', 'ink/fx_smoke', 'ink/fx_dust', 'ink/fx_leaf', 'ink/birds',
+  'ink/i_hammer', 'ink/i_lock', 'ink/i_swords', 'ink/i_spear', 'ink/i_gather',
 ] as const;
 
 export type AssetName = (typeof NAMES)[number];

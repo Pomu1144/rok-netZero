@@ -4,7 +4,8 @@ import type { Game } from '../game/game';
 import { isHidden, marchPosition, maxBarbLevel, objSprite } from '../game/logic';
 import { PLAYER_POS, WORLD_SIZE, type WorldObj } from '../game/state';
 import { Camera } from './camera';
-import { Fx, mirroredPattern } from './fx';
+import type { March } from '../game/state';
+import { Fx, inkLabel, mirroredPattern } from './fx';
 
 export const T = 64;
 
@@ -18,6 +19,9 @@ export class WorldView {
   private ctx: CanvasRenderingContext2D;
   private ground: CanvasPattern | null = null;
   private time = 0;
+  private clashes: { x: number; y: number; t: number; win: boolean }[] = [];
+  private dustClock = 0;
+  private mists = Array.from({ length: 5 }, (_, i) => ({ x: (i / 5) * 2400 - 300, y: 80 + ((i * 337) % 700), s: 0.8 + (i % 3) * 0.3, v: 0.006 + (i % 2) * 0.004 }));
   hoverId: string | null = null;
   selectedId: string | null = null;
   onSelect: (objId: string | null, tile: { x: number; y: number }) => void = () => {};
@@ -127,21 +131,33 @@ export class WorldView {
       ctx.fillRect(0, 0, (WORLD_SIZE * T) / 0.75, (WORLD_SIZE * T) / 0.75);
       ctx.restore();
     }
-    // map edge
-    ctx.strokeStyle = 'rgba(255,210,120,0.6)';
-    ctx.lineWidth = 6 / cam.zoom;
-    ctx.setLineDash([30, 20]);
-    ctx.strokeRect(0, 0, WORLD_SIZE * T, WORLD_SIZE * T);
-    ctx.setLineDash([]);
+    // the known world fades into ink at its edges
+    ctx.save();
+    ctx.filter = 'blur(28px)';
+    ctx.strokeStyle = 'rgba(12,12,10,0.85)';
+    ctx.lineWidth = 140;
+    ctx.strokeRect(-40, -40, WORLD_SIZE * T + 80, WORLD_SIZE * T + 80);
+    ctx.filter = 'none';
+    ctx.restore();
 
-    // territory around the player's city
-    ctx.fillStyle = 'rgba(60,120,230,0.10)';
-    ctx.strokeStyle = 'rgba(90,150,255,0.55)';
-    ctx.lineWidth = 3 / cam.zoom;
-    ctx.beginPath();
-    ctx.rect((PLAYER_POS.x - 6) * T, (PLAYER_POS.y - 6) * T, 12 * T, 12 * T);
-    ctx.fill();
-    ctx.stroke();
+    // territory around the player's city: hairline gold with corner ticks
+    const tx0 = (PLAYER_POS.x - 6) * T;
+    const ty0 = (PLAYER_POS.y - 6) * T;
+    const ts = 12 * T;
+    ctx.fillStyle = 'rgba(201,162,78,0.07)';
+    ctx.fillRect(tx0, ty0, ts, ts);
+    ctx.strokeStyle = 'rgba(232,207,140,0.55)';
+    ctx.lineWidth = 1.5 / cam.zoom;
+    ctx.strokeRect(tx0, ty0, ts, ts);
+    ctx.lineWidth = 4 / cam.zoom;
+    const tick = 40;
+    for (const [cx, cy, dx, dy] of [[tx0, ty0, 1, 1], [tx0 + ts, ty0, -1, 1], [tx0, ty0 + ts, 1, -1], [tx0 + ts, ty0 + ts, -1, -1]]) {
+      ctx.beginPath();
+      ctx.moveTo(cx + dx * tick, cy);
+      ctx.lineTo(cx, cy);
+      ctx.lineTo(cx, cy + dy * tick);
+      ctx.stroke();
+    }
 
     // tile grid when zoomed in
     if (cam.zoom > 0.7) {
@@ -159,22 +175,38 @@ export class WorldView {
       ctx.stroke();
     }
 
-    // march routes underneath sprites
+    // march routes: dotted ink trails
     for (const m of s.marches) {
+      if (m.phase === 'gathering') continue;
       const p = marchPosition(s, m);
-      const color = m.phase === 'returning' ? '#e8e8e8' : m.kind === 'gather' ? '#7ee06a' : m.kind === 'scout' ? '#f2d16b' : '#ff6a4d';
-      if (m.phase !== 'gathering') {
-        ctx.strokeStyle = color;
+      const color = m.phase === 'returning' ? 'rgba(241,235,220,0.75)' : m.kind === 'gather' ? 'rgba(143,181,138,0.95)' : m.kind === 'scout' ? 'rgba(232,207,140,0.95)' : 'rgba(217,96,79,0.95)';
+      ctx.strokeStyle = 'rgba(10,10,10,0.35)';
+      ctx.lineWidth = 9 / Math.max(0.4, cam.zoom);
+      ctx.lineCap = 'round';
+      ctx.setLineDash([1, 22 / Math.max(0.4, cam.zoom)]);
+      ctx.lineDashOffset = -this.time / 40;
+      ctx.beginPath();
+      ctx.moveTo(p.x * T, p.y * T + 3);
+      ctx.lineTo(m.toX * T, m.toY * T + 3);
+      ctx.stroke();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 6 / Math.max(0.4, cam.zoom);
+      ctx.beginPath();
+      ctx.moveTo(p.x * T, p.y * T);
+      ctx.lineTo(m.toX * T, m.toY * T);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.lineCap = 'butt';
+      // destination marker
+      const ens = img('ink/ink_enso_gold');
+      if (ens) {
+        const r = 26 / Math.max(0.5, cam.zoom);
+        ctx.save();
+        ctx.translate(m.toX * T, m.toY * T);
+        ctx.rotate(this.time / 900);
         ctx.globalAlpha = 0.85;
-        ctx.lineWidth = 4 / Math.max(0.4, cam.zoom);
-        ctx.setLineDash([14, 10]);
-        ctx.lineDashOffset = -this.time / 30;
-        ctx.beginPath();
-        ctx.moveTo(p.x * T, p.y * T);
-        ctx.lineTo(m.toX * T, m.toY * T);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.globalAlpha = 1;
+        ctx.drawImage(ens, -r, -r, r * 2, r * 2);
+        ctx.restore();
       }
     }
 
@@ -191,10 +223,15 @@ export class WorldView {
     }
     if (!homeDrawn) this.drawHome(ctx);
 
+    this.dustClock -= dt;
+    const kickDust = this.dustClock <= 0;
+    if (kickDust) this.dustClock = 160;
     for (const m of s.marches) {
       const p = marchPosition(s, m);
-      this.drawMarch(ctx, p.x * T, p.y * T, m.commanderId, m.kind, m.phase === 'gathering', m.toX < m.fromX);
+      if (kickDust && m.phase !== 'gathering' && m.kind !== 'scout') this.fx.dust(p.x * T - (m.toX > m.fromX ? 18 : -18), p.y * T + 4, 1, 0.9);
+      this.drawMarch(ctx, p.x * T, p.y * T, m);
     }
+    this.drawClashes(ctx, dt);
 
     if (s.raid) {
       // incoming warband approaching from the map edge
@@ -213,7 +250,61 @@ export class WorldView {
       if (im) ctx.drawImage(im, x - 40, y - 70, 80, 80);
     }
 
+    this.fx.drawBack(ctx);
     this.fx.draw(ctx, cam.zoom);
+    this.drawMist(ctx, dt, dpr);
+  }
+
+  /** A clash of arms at a world tile: crossed swords strike, red ink flies, a seal is stamped. */
+  battleFx(tx: number, ty: number, win: boolean): void {
+    const x = tx * T;
+    const y = ty * T - 30;
+    this.clashes.push({ x, y, t: 0, win });
+    this.fx.splatter(x, y, 8);
+    this.fx.dust(x, y + 30, 8, 2.2);
+    this.fx.wave(x, y + 30, 260);
+    setTimeout(() => this.fx.stamp(x + 60, y - 50, win ? '勝' : '敗', 80), 500);
+    if (win) setTimeout(() => this.fx.leaves(x, y, 26, 1.3), 520);
+  }
+
+  private drawClashes(ctx: CanvasRenderingContext2D, dt: number): void {
+    const sw = img('ink/i_swords');
+    for (const c of this.clashes) c.t += dt;
+    this.clashes = this.clashes.filter((c) => c.t < 1300);
+    if (!sw) return;
+    for (const c of this.clashes) {
+      const k = c.t / 1300;
+      const pop = k < 0.15 ? k / 0.15 : 1;
+      const shake = k < 0.5 ? Math.sin(c.t / 18) * 6 * (1 - k * 2) : 0;
+      const s = (90 + 40 * (1 - pop)) / Math.max(0.6, this.camera.zoom);
+      ctx.save();
+      ctx.globalAlpha = k > 0.75 ? (1 - k) / 0.25 : 1;
+      ctx.translate(c.x + shake, c.y);
+      ctx.filter = 'drop-shadow(0 0 10px rgba(217,96,79,0.9))';
+      ctx.drawImage(sw, -s / 2, -s / 2, s, s);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /** Ink-wash mist drifting across the screen (parallax: moves slower than the map). */
+  private drawMist(ctx: CanvasRenderingContext2D, dt: number, dpr: number): void {
+    const mist = img('ink/ink_mist');
+    if (!mist) return;
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const W = this.camera.width;
+    for (const m of this.mists) {
+      m.x += dt * m.v;
+      const w = 760 * m.s;
+      const h = (w * mist.naturalHeight) / mist.naturalWidth;
+      const px = ((m.x - this.camera.x * 0.15) % (W + w * 2) + W + w * 2) % (W + w * 2) - w;
+      const py = m.y - this.camera.y * 0.05 + 200;
+      ctx.globalAlpha = 0.14;
+      ctx.drawImage(mist, px, ((py % 900) + 900) % 900 - 100, w, h);
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
   }
 
   private drawHome(ctx: CanvasRenderingContext2D): void {
@@ -225,13 +316,13 @@ export class WorldView {
       const h = (w * im.naturalHeight) / im.naturalWidth;
       if (this.hoverId === 'home' || this.selectedId === 'home') {
         ctx.save();
-        ctx.shadowColor = 'rgba(120,180,255,0.95)';
+        ctx.shadowColor = 'rgba(246,225,160,0.95)';
         ctx.shadowBlur = 30;
         ctx.drawImage(im, x - w / 2, y - h * 0.68, w, h);
         ctx.restore();
       } else ctx.drawImage(im, x - w / 2, y - h * 0.68, w, h);
     }
-    this.tag(ctx, x, y + T * 1.45, `${this.game.state.governor}`, '#3d7be0');
+    inkLabel(ctx, x, y + T * 1.35, this.game.state.governor, 1 / Math.max(0.6, this.camera.zoom), 'rgba(232,207,140,0.95)');
   }
 
   private drawObj(ctx: CanvasRenderingContext2D, o: WorldObj, labels: boolean): void {
@@ -255,93 +346,104 @@ export class WorldView {
       ctx.globalAlpha = 1;
     }
     if (o.kind === 'holy' && o.heldUntil && o.heldUntil > s.time) {
-      const pulse = 0.5 + Math.sin(this.time / 300) * 0.25;
-      ctx.strokeStyle = `rgba(90,160,255,${pulse})`;
-      ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.ellipse(x, y + 10, size * 0.55, size * 0.28, 0, 0, Math.PI * 2);
-      ctx.stroke();
+      const ens = img('ink/ink_enso_gold');
+      if (ens) {
+        ctx.save();
+        ctx.translate(x, y + 10);
+        ctx.scale(1, 0.5);
+        ctx.rotate(this.time / 2000);
+        ctx.globalAlpha = 0.6 + Math.sin(this.time / 300) * 0.25;
+        ctx.drawImage(ens, -size * 0.6, -size * 0.6, size * 1.2, size * 1.2);
+        ctx.restore();
+      }
     }
     if (!labels || o.kind === 'deco') return;
-    let color = '#5b5b5b';
+    let accent = 'rgba(226,204,150,0.5)';
     let text = '';
     if (o.kind === 'barbarian') {
-      color = o.level <= maxBarbLevel(s) ? '#b8442e' : '#5b5b5b';
-      text = `Lv.${o.level}`;
+      accent = o.level <= maxBarbLevel(s) ? 'rgba(217,96,79,0.95)' : 'rgba(226,204,150,0.3)';
+      text = `Barbarians · ${o.level}`;
     } else if (o.kind === 'fort') {
-      color = '#8a2219';
-      text = `Fort Lv.${o.level}`;
+      accent = 'rgba(217,96,79,0.95)';
+      text = `Fort · ${o.level}`;
     } else if (o.kind === 'node') {
-      color = o.occupiedBy ? '#3d7be0' : '#4c7a34';
-      text = `Lv.${o.level}`;
+      accent = o.occupiedBy ? 'rgba(232,207,140,0.95)' : 'rgba(143,181,138,0.9)';
+      text = `${{ food: 'Cropland', wood: 'Timber', stone: 'Stone', gold: 'Gold' }[o.res!]} · ${o.level}`;
     } else if (o.kind === 'city') {
-      color = '#7a3fb0';
+      accent = 'rgba(185,163,217,0.9)';
       text = o.name ?? 'City';
     } else if (o.kind === 'holy') {
-      color = o.heldUntil && o.heldUntil > s.time ? '#3d7be0' : '#b08a2e';
+      accent = 'rgba(232,207,140,0.95)';
       text = o.name ?? 'Holy Site';
     }
-    this.tag(ctx, x, y + size * 0.36, text, color);
+    const k = 1 / Math.max(0.6, this.camera.zoom);
+    inkLabel(ctx, x, y + size * 0.3, text, k, accent);
     if (o.kind === 'node' && o.maxAmount) {
       const frac = (o.amount ?? 0) / o.maxAmount;
-      ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      ctx.fillRect(x - 30, y + size * 0.36 + 24, 60, 6);
-      ctx.fillStyle = '#9be36b';
-      ctx.fillRect(x - 30, y + size * 0.36 + 24, 60 * frac, 6);
+      const w = 70 * k;
+      ctx.fillStyle = 'rgba(10,10,12,0.8)';
+      ctx.fillRect(x - w / 2, y + size * 0.3 + 27 * k, w, 4 * k);
+      ctx.fillStyle = '#e8cf8c';
+      ctx.fillRect(x - w / 2, y + size * 0.3 + 27 * k, w * frac, 4 * k);
     }
   }
 
-  private tag(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, color: string): void {
-    const k = 1 / Math.max(0.6, this.camera.zoom);
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(k, k);
-    ctx.font = '700 14px Cinzel, Georgia, serif';
-    const w = ctx.measureText(text).width + 20;
-    ctx.fillStyle = color;
-    ctx.globalAlpha = 0.92;
-    ctx.beginPath();
-    ctx.roundRect(-w / 2, -11, w, 22, 6);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = 'rgba(255,230,160,0.8)';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-    ctx.fillStyle = '#fff';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, 0, 1);
-    ctx.restore();
-  }
-
-  private drawMarch(ctx: CanvasRenderingContext2D, x: number, y: number, commanderId: string | null, kind: string, gathering: boolean, flip: boolean): void {
+  /** A marching column: a small formation of the march's troop types led by its commander's banner. */
+  private drawMarch(ctx: CanvasRenderingContext2D, x: number, y: number, m: March): void {
     const k = 1 / Math.max(0.5, this.camera.zoom);
+    const gathering = m.phase === 'gathering';
+    const flip = m.toX < m.fromX ? -1 : 1;
+    const types = Object.keys(m.troops)
+      .filter((id) => (m.troops[id] ?? 0) > 0)
+      .sort((a, b) => (m.troops[b] ?? 0) - (m.troops[a] ?? 0))
+      .map((id) => id.split('_')[0]);
+    const ranks = m.kind === 'scout' ? ['cavalry'] : types.length ? [types[0], types[1] ?? types[0], types[0]] : ['infantry'];
+    const slots: [number, number][] = [[0, 0], [-26, -10], [-26, 12]];
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(k, k);
-    const bob = gathering ? 0 : Math.sin(this.time / 120) * 2;
-    const tok = img(kind === 'scout' ? 'unit_cavalry' : 'march_token');
-    if (tok) {
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(-10 * flip, 6, 40, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // back ranks first
+    const order = ranks.map((t, i) => ({ t, i })).sort((a, b) => slots[a.i][1] - slots[b.i][1]);
+    for (const { t, i } of order) {
+      const im = img(`unit_${t}`);
+      if (!im) continue;
+      const bob = gathering ? 0 : Math.abs(Math.sin(this.time / 120 + i * 1.7)) * 3;
+      const sz = t === 'cavalry' ? 58 : t === 'siege' ? 54 : 46;
       ctx.save();
-      if (flip) ctx.scale(-1, 1);
-      ctx.drawImage(tok, -38, -62 + bob, 76, 76);
+      ctx.translate(slots[i][0] * flip, slots[i][1] - bob);
+      ctx.scale(flip, 1);
+      ctx.drawImage(im, -sz / 2, -sz * 0.9, sz, sz);
       ctx.restore();
     }
-    if (commanderId) {
-      const p = img(COMMANDER_BY_ID[commanderId].portrait);
-      ctx.save();
+    if (m.commanderId) {
+      const p = img(COMMANDER_BY_ID[m.commanderId].portrait);
+      const bx = 18 * flip;
+      const by = -76;
+      // banner pole
+      ctx.strokeStyle = 'rgba(20,16,10,0.9)';
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(0, -74, 18, 0, Math.PI * 2);
-      ctx.fillStyle = '#123';
-      ctx.fill();
-      ctx.clip();
-      if (p) ctx.drawImage(p, -18, -92, 36, 48);
-      ctx.restore();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = gathering ? '#7ee06a' : '#e8c766';
-      ctx.beginPath();
-      ctx.arc(0, -74, 18, 0, Math.PI * 2);
+      ctx.moveTo(bx, by + 22);
+      ctx.lineTo(bx, -8);
       ctx.stroke();
+      ctx.fillStyle = 'rgba(10,10,12,0.92)';
+      ctx.fillRect(bx - 20, by - 22, 40, 46);
+      if (p) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(bx - 17, by - 19, 34, 40);
+        ctx.clip();
+        ctx.drawImage(p, bx - 17, by - 19, 34, 45);
+        ctx.restore();
+      }
+      ctx.strokeStyle = gathering ? 'rgba(143,181,138,0.95)' : m.kind === 'attack' && m.phase !== 'returning' ? 'rgba(217,96,79,0.95)' : 'rgba(232,207,140,0.9)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(bx - 19.5, by - 21.5, 39, 45);
     }
     ctx.restore();
   }

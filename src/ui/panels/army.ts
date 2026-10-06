@@ -13,7 +13,7 @@ import {
   xpToNext,
 } from '../../data/commanders';
 import { ITEMS } from '../../data/items';
-import { TROOP_NAMES, TROOP_SPRITES, troopStats } from '../../data/troops';
+import { TROOP_NAMES, TROOP_SPRITES } from '../../data/troops';
 import type { TroopType } from '../../data/types';
 import { troopPower } from '../../game/battle';
 import {
@@ -36,23 +36,27 @@ import {
   useTome,
   validateMarch,
 } from '../../game/logic';
-import { sumTroops, type Troops } from '../../game/state';
+import { sumTroops, type Reward, type Troops } from '../../game/state';
 import type { UiCtx } from '../ctx';
-import { icon, onAct, openModal, rewardHtml, stars, toast } from '../dom';
+import { icon, onAct, openModal, toast } from '../dom';
 import { esc, fmt, fmtFull, fmtTime } from '../format';
+import { ink, pips, req, skillIcon, stars } from '../ink';
 
-const SKILL_ICONS = ['⚔️', '🛡️', '✨', '👑'];
+/** First character of a commander's name, pressed into their seal. */
+const CMD_SEAL: Record<string, string> = { boudica: '炎', suntzu: '帥', cleopatra: '金', joan: '聖', caesar: '王', khan: '馬' };
 
-export function cmdCard(ctx: UiCtx, id: string): string {
+export function cmdCard(ctx: UiCtx, id: string, delay = 0): string {
   const def = COMMANDER_BY_ID[id];
   const c = ctx.game.state.commanders[id];
   const busy = commanderBusy(ctx.game.state, id);
-  return `<div class="cmd-card ${def.rarity} ${c.unlocked ? '' : 'locked'}" data-act="cmd" data-id="${id}" style="background-image:url(${assetUrl(def.portrait)})">
-    ${c.unlocked ? `<div class="cc-lv">Lv.${c.level}</div>` : ''}
-    ${busy ? '<div class="cc-busy">Marching</div>' : ''}
+  return `<div class="cmd-card ${def.rarity} ${c.unlocked ? '' : 'locked'}" data-act="cmd" data-id="${id}" style="background-image:url(${assetUrl(def.portrait)});animation-delay:${delay}s">
+    ${c.unlocked ? `<div class="cc-lv">${c.level}</div>` : ''}
+    ${busy ? '<div class="cc-busy">MARCHING</div>' : ''}
     <div class="cc-foot">
+      <div class="cc-rar">${def.rarity}</div>
       <div class="cc-name">${def.name}</div>
-      ${c.unlocked ? stars(c.stars) : `<div style="font-size:12px">${icon('ic_sculpture', 16)} ${c.sculptures}/${UNLOCK_SCULPTURES[def.rarity]}</div>`}
+      <div class="cc-brush"></div>
+      ${c.unlocked ? stars(c.stars) : `<div class="cc-sculpt">${icon('ic_sculpture', 16)} ${c.sculptures} / ${UNLOCK_SCULPTURES[def.rarity]}</div>`}
     </div>
   </div>`;
 }
@@ -60,13 +64,15 @@ export function cmdCard(ctx: UiCtx, id: string): string {
 export function openCommanders(ctx: UiCtx): void {
   openModal({
     title: 'Commanders',
+    seal: '将',
+    kicker: 'Hall of generals',
     size: 'wide',
-    dark: true,
     live: true,
     render: (body) => {
-      const list = [...COMMANDERS].sort((a, b) => Number(ctx.game.state.commanders[b.id].unlocked) - Number(ctx.game.state.commanders[a.id].unlocked));
-      body.innerHTML = `<div class="cmd-grid">${list.map((c) => cmdCard(ctx, c.id)).join('')}</div>
-        <p class="muted center">Recruit commanders from Tavern chests or by collecting their sculptures. Barbarians and forts also drop sculptures.</p>`;
+      const s = ctx.game.state;
+      const list = [...COMMANDERS].sort((a, b) => Number(s.commanders[b.id].unlocked) - Number(s.commanders[a.id].unlocked));
+      body.innerHTML = `<div class="cmd-grid">${list.map((c, i) => cmdCard(ctx, c.id, i * 0.05)).join('')}</div>
+        <p class="muted center" style="margin-top:16px;font-style:italic">Recruit generals from Tavern chests or by gathering their sculptures. Barbarians and forts surrender sculptures too.</p>`;
       onAct(body, { cmd: (t) => openCommander(ctx, t.dataset.id!) });
     },
   });
@@ -76,8 +82,9 @@ export function openCommander(ctx: UiCtx, id: string): void {
   const def = COMMANDER_BY_ID[id];
   openModal({
     title: def.name,
+    seal: '将',
+    kicker: `${def.rarity} commander`,
     size: 'wide',
-    dark: true,
     live: true,
     render: (body) => {
       const s = ctx.game.state;
@@ -88,55 +95,56 @@ export function openCommander(ctx: UiCtx, id: string): void {
       const tomes = (['tome_500', 'tome_2000'] as const).filter((t) => (s.items[t] ?? 0) > 0);
       body.innerHTML = `
         <div class="cmd-detail">
-          <div>
-            <div class="cmd-portrait" style="background-image:url(${assetUrl(def.portrait)})"><span class="rarity ${def.rarity}">${def.rarity}</span></div>
+          <div class="cmd-portrait" style="background-image:url(${assetUrl(def.portrait)})">
+            <div class="seal-big">${CMD_SEAL[id] ?? '将'}</div>
+            <div class="rarity">${c.unlocked ? stars(c.stars) : ''}</div>
           </div>
-          <div class="col">
-            <div class="lvl-arrow" style="color:var(--gold-3)">${def.name}</div>
-            <div class="muted">${esc(def.title)}</div>
+          <div class="col" style="gap:10px">
+            <div><div class="kicker">${esc(def.title)}</div><div class="cmd-name">${def.name}</div></div>
             <div class="tags">${def.specialties.map((t) => `<span class="tag">${t}</span>`).join('')}</div>
             ${
               c.unlocked
-                ? `<div class="row">${stars(c.stars)}<span class="muted">Level ${c.level} / ${cap}</span></div>
-                   <div class="bar blue" style="height:12px"><div style="width:${Math.min(100, (c.xp / need) * 100)}%"></div></div>
-                   <div class="muted">${fmtFull(c.xp)} / ${fmtFull(need)} XP · Troop capacity ${fmtFull(marchCapacity(s, id))}</div>
-                   <div class="row" style="flex-wrap:wrap;gap:6px">
-                     ${tomes.map((t) => `<button class="btn btn-blue btn-sm" data-act="tome" data-item="${t}">${icon('ic_tome')} ${ITEMS[t].name} (${s.items[t]})</button>`).join('') || '<span class="muted">No tomes. Defeat barbarians for XP.</span>'}
-                     ${
-                       c.stars < MAX_STARS
-                         ? `<button class="btn btn-gold btn-sm" data-act="star" ${c.level < cap ? 'disabled' : ''} title="Requires Lv.${cap}">★ Star Up · ${icon('ic_sculpture', 16)}${star.sculptures} ${icon('ic_gold', 16)}${fmt(star.gold)}</button>`
-                         : ''
-                     }
+                ? `<div class="card">
+                     <div class="row"><div class="grow"><div class="kicker">Level</div><div class="lvl-arrow">${c.level}<small>OF ${cap}</small></div></div>
+                     <div style="text-align:right"><div class="kicker">Troop capacity</div><div class="num" style="font-size:17px">${fmtFull(marchCapacity(s, id))}</div></div></div>
+                     <div class="bar blue" style="margin-top:8px"><div style="width:${Math.min(100, (c.xp / need) * 100)}%"></div></div>
+                     <div class="muted" style="margin-top:4px;font-size:11.5px">${fmtFull(c.xp)} / ${fmtFull(need)} experience</div>
+                     <div class="action-row" style="justify-content:flex-start;margin-top:12px">
+                       ${tomes.map((t) => `<button class="btn btn-sm" data-act="tome" data-item="${t}">${icon('ic_tome', 18)} ${ITEMS[t].name} · ${s.items[t]}</button>`).join('') || '<span class="muted">No tomes — slay barbarians to gain experience.</span>'}
+                       ${c.stars < MAX_STARS ? `<button class="btn btn-sm btn-gold" data-act="star" ${c.level < cap ? 'disabled' : ''} title="Requires Lv.${cap}">${ink('i_star', 15)} Ascend · ${icon('ic_sculpture', 15)}${star.sculptures} ${icon('ic_gold', 15)}${fmt(star.gold)}</button>` : ''}
+                     </div>
                    </div>`
-                : `<div class="card"><b>Not recruited.</b> Collect ${UNLOCK_SCULPTURES[def.rarity]} sculptures to recruit. You have ${c.sculptures}.
-                   <div class="action-row"><button class="btn btn-gold" data-act="unlock" ${c.sculptures < UNLOCK_SCULPTURES[def.rarity] ? 'disabled' : ''}>Recruit</button></div></div>`
+                : `<div class="card">${req(false, `Not yet recruited · ${c.sculptures} / ${UNLOCK_SCULPTURES[def.rarity]} sculptures`)}
+                   <div class="action-row"><button class="btn btn-gold" data-act="unlock" ${c.sculptures < UNLOCK_SCULPTURES[def.rarity] ? 'disabled' : ''}>${ink('i_crown', 18)} Recruit</button></div></div>`
             }
-            <h3 class="sec">Skills <span class="muted" style="text-transform:none;letter-spacing:0">${icon('ic_sculpture', 18)} ${c.sculptures} sculptures</span></h3>
+            <h3 class="sec">Skills <span class="muted">${icon('ic_sculpture', 16)} ${c.sculptures} sculptures</span></h3>
+            <div>
             ${def.skills
               .map((sk, i) => {
                 const lv = c.skills[i];
                 const cost = skillUpgradeCost(lv);
                 return `<div class="skill">
-                  <div class="skill-icon ${sk.kind === 'active' ? 'active' : ''} ${lv === 0 ? 'locked' : ''}">${SKILL_ICONS[i]}</div>
+                  <div class="skill-icon ${sk.kind === 'active' ? 'active' : ''} ${lv === 0 ? 'locked' : ''}">${ink(skillIcon(sk), 26, sk.kind === 'active' ? 'gold' : 'cream')}</div>
                   <div class="grow">
-                    <div class="skill-name">${sk.name} <span class="skill-lv">${sk.kind === 'active' ? 'Active · 1000 rage' : 'Passive'} · ${lv}/${MAX_SKILL_LEVEL}</span></div>
+                    <div><span class="skill-name">${sk.name}</span><span class="skill-lv">${sk.kind === 'active' ? 'ACTIVE · 1000 RAGE' : 'PASSIVE'}</span>${pips(lv, MAX_SKILL_LEVEL)}</div>
                     <div class="muted">${esc(skillText(sk, Math.max(1, lv)))}</div>
                   </div>
                   ${
                     c.unlocked && lv < MAX_SKILL_LEVEL
-                      ? `<button class="btn btn-purple btn-sm" data-act="skill" data-i="${i}" ${c.sculptures < cost || (i > 0 && c.skills[i - 1] < 1) ? 'disabled' : ''}>${lv === 0 ? 'Unlock' : 'Upgrade'} ${icon('ic_sculpture', 16)}${cost}</button>`
+                      ? `<button class="btn btn-sm" data-act="skill" data-i="${i}" ${c.sculptures < cost || (i > 0 && c.skills[i - 1] < 1) ? 'disabled' : ''}>${lv === 0 ? 'Awaken' : 'Refine'} ${icon('ic_sculpture', 15)}${cost}</button>`
                       : ''
                   }
                 </div>`;
               })
               .join('')}
+            </div>
           </div>
         </div>`;
       onAct(body, {
         tome: (t) => ctx.run((st) => useTome(st, t.dataset.item as 'tome_500', id), sfx.coin),
         star: () => ctx.run((st) => starUp(st, id), sfx.fanfare),
         unlock: () => {
-          if (ctx.run((st) => unlockCommander(st, id), sfx.fanfare)) toast(`${def.name} joins your cause!`, 'good', def.portrait);
+          if (ctx.run((st) => unlockCommander(st, id), sfx.fanfare)) toast(`${def.name} joins your cause`, 'good', def.portrait);
         },
         skill: (t) => ctx.run((st) => upgradeSkill(st, id, Number(t.dataset.i)), sfx.fanfare),
       });
@@ -151,11 +159,10 @@ export function openMarch(ctx: UiCtx, targetId: string, kind: 'attack' | 'gather
   const target = findObj(s0, targetId);
   if (!target) return;
   if (kind === 'scout') {
-    if (ctx.run((st) => sendMarch(st, { kind: 'scout', targetId, commanderId: null, troops: {} }), sfx.march)) toast('Scouts dispatched', 'good', 'scout_camp');
+    if (ctx.run((st) => sendMarch(st, { kind: 'scout', targetId, commanderId: null, troops: {} }), sfx.march)) toast('Scouts ride out', 'good', 'ink/i_eye');
     return;
   }
   const idle = COMMANDERS.filter((c) => s0.commanders[c.id].unlocked && !commanderBusy(s0, c.id));
-  // prefer gathering commanders for gathering, otherwise the strongest
   idle.sort((a, b) => {
     const pref = (x: typeof a) => (kind === 'gather' && x.specialties.includes('Gathering') ? 1000 : 0) + s0.commanders[x.id].level;
     return pref(b) - pref(a);
@@ -168,7 +175,6 @@ export function openMarch(ctx: UiCtx, targetId: string, kind: 'attack' | 'gather
     const cap = marchCapacity(s, commanderId);
     sel = {};
     let left = cap;
-    // highest tiers first, balanced across types
     const ids = Object.keys(s.troops)
       .filter((k) => (s.troops[k] ?? 0) > 0)
       .sort((a, b) => Number(b.split('_')[1]) - Number(a.split('_')[1]));
@@ -184,8 +190,9 @@ export function openMarch(ctx: UiCtx, targetId: string, kind: 'attack' | 'gather
   autoFill();
 
   openModal({
-    title: kind === 'gather' ? 'Gather Resources' : 'Dispatch Army',
-    dark: true,
+    title: kind === 'gather' ? 'Send gatherers' : 'Dispatch army',
+    seal: kind === 'gather' ? '採' : '戦',
+    kicker: kind === 'gather' ? 'World · Gather' : 'World · March',
     render: (body, h) => {
       const s = ctx.game.state;
       const t = findObj(s, targetId);
@@ -202,48 +209,50 @@ export function openMarch(ctx: UiCtx, targetId: string, kind: 'attack' | 'gather
       const enemy = t.troops ? troopPower(t.troops) : 0;
       const mine = troopPower(sel);
       const ratio = enemy > 0 ? mine / enemy : 0;
-      const verdict = kind === 'attack' ? (ratio > 1.6 ? ['Easy', '#7ee06a'] : ratio > 1.05 ? ['Even', '#ffd978'] : ['Dangerous', '#ff6a4d']) : null;
+      const verdict = kind === 'attack' ? (ratio > 1.6 ? ['Assured', 'var(--jade)'] : ratio > 1.05 ? ['Even', 'var(--accent-2)'] : ['Perilous', 'var(--red-2)']) : null;
+      const ap = kind === 'attack' && t.kind === 'barbarian' ? BARB_AP_COST : kind === 'attack' && t.kind === 'fort' ? FORT_AP_COST : 0;
       body.innerHTML = `
-        <div class="row card">
-          <img src="${assetUrl(objSprite(t))}" style="width:70px;height:70px;object-fit:contain">
-          <div class="grow"><b>${esc(objLabel(t))}</b><div class="muted">(${t.x}, ${t.y})${t.troops && t.scoutedAt ? ` · Scouted garrison: ${fmtFull(sumTroops(t.troops))}` : t.kind === 'barbarian' || t.kind === 'fort' ? ` · Garrison ≈ ${fmtFull(sumTroops(t.troops ?? {}))}` : ''}</div></div>
-          ${verdict ? `<div style="font-family:var(--display);font-weight:900;color:${verdict[1]}">${verdict[0]}</div>` : ''}
+        <div class="card target-card">
+          <img src="${assetUrl(objSprite(t))}" alt="">
+          <div class="grow"><div class="kicker">Target · ${t.x}, ${t.y}</div><div style="font-weight:700;font-size:17px">${esc(objLabel(t))}</div>
+          <div class="muted">${t.troops && (t.scoutedAt || t.kind === 'barbarian' || t.kind === 'fort') ? `Garrison of ${fmtFull(sumTroops(t.troops))}` : t.kind === 'node' ? `${fmtFull(t.amount ?? 0)} ${t.res} remaining` : 'Garrison unknown — scout first'}</div></div>
+          ${verdict ? `<div class="odds" style="color:${verdict[1]}">${verdict[0]}</div>` : ''}
         </div>
         <h3 class="sec">Commander</h3>
         <div class="march-cmds">
           ${COMMANDERS.filter((c) => s.commanders[c.id].unlocked)
             .map((c) => {
               const busy = commanderBusy(s, c.id);
-              return `<div class="march-cmd ${commanderId === c.id ? 'sel' : ''} ${busy ? 'busy' : ''}" data-act="${busy ? '' : 'pick'}" data-id="${c.id}" style="background-image:url(${assetUrl(c.portrait)})"><div class="mc-name">${c.name}<br>Lv.${s.commanders[c.id].level}</div></div>`;
+              return `<div class="march-cmd ${commanderId === c.id ? 'sel' : ''} ${busy ? 'busy' : ''}" data-act="${busy ? '' : 'pick'}" data-id="${c.id}" style="background-image:url(${assetUrl(c.portrait)})"><div class="mc-name">${c.name}<br><small>LV ${s.commanders[c.id].level}</small></div></div>`;
             })
             .join('')}
         </div>
-        <h3 class="sec">Troops <span class="muted" style="text-transform:none;letter-spacing:0">${fmtFull(n)} / ${fmtFull(cap)}</span>
-          <button class="btn btn-dark btn-sm" data-act="auto">Auto</button><button class="btn btn-dark btn-sm" data-act="clear">Clear</button></h3>
+        <h3 class="sec">Troops <span class="muted">${fmtFull(n)} / ${fmtFull(cap)}</span>
+          <button class="btn btn-sm" data-act="auto">Auto</button><button class="btn btn-sm" data-act="clear">Clear</button></h3>
         ${
           avail.length
             ? avail
                 .map((k) => {
                   const [ty, tier] = k.split('_');
                   return `<div class="troop-row">
-                    <img src="${assetUrl(TROOP_SPRITES[ty as TroopType])}">
-                    <div><div><b>${TROOP_NAMES[ty as TroopType][Number(tier) - 1]}</b> <span class="muted">T${tier} · ${fmtFull(s.troops[k])} available</span></div>
+                    <img src="${assetUrl(TROOP_SPRITES[ty as TroopType])}" alt="">
+                    <div><div><b>${TROOP_NAMES[ty as TroopType][Number(tier) - 1]}</b> <span class="muted">· ${fmtFull(s.troops[k])} at home</span></div>
                     <input type="range" min="0" max="${s.troops[k]}" value="${sel[k] ?? 0}" data-troop="${k}"></div>
                     <input type="number" min="0" max="${s.troops[k]}" value="${sel[k] ?? 0}" data-troopn="${k}">
                   </div>`;
                 })
                 .join('')
-            : '<div class="muted">No troops in the city. Train some at the Barracks.</div>'
+            : '<div class="muted">The barracks stand empty. Train soldiers first.</div>'
         }
         <div class="spacer"></div>
         <div class="march-stats">
           <div class="mstat"><div class="v">${fmt(mine)}</div><div class="k">Power</div></div>
           <div class="mstat"><div class="v">${fmt(troopLoad(s, sel, commanderId))}</div><div class="k">Load</div></div>
-          <div class="mstat"><div class="v">${fmtTime(secs)}</div><div class="k">March time</div></div>
-          <div class="mstat"><div class="v">${kind === 'attack' && t.kind === 'barbarian' ? `${icon('ic_ap', 16)}${BARB_AP_COST}` : kind === 'attack' && t.kind === 'fort' ? `${icon('ic_ap', 16)}${FORT_AP_COST}` : '—'}</div><div class="k">AP cost</div></div>
+          <div class="mstat"><div class="v">${fmtTime(secs)}</div><div class="k">March</div></div>
+          <div class="mstat"><div class="v">${ap ? `${icon('ic_ap', 18)}${ap}` : '—'}</div><div class="k">Action points</div></div>
         </div>
-        ${!valid.ok && n > 0 ? `<div class="req center" style="margin-top:10px">${esc(valid.reason)}</div>` : ''}
-        <div class="action-row"><button class="btn ${kind === 'gather' ? 'btn-green' : 'btn-red'} btn-xl" data-act="go" ${!valid.ok ? 'disabled' : ''}>${kind === 'gather' ? 'Gather' : 'March'}</button></div>`;
+        ${!valid.ok && n > 0 ? `<div style="margin-top:12px">${req(false, esc(valid.reason))}</div>` : ''}
+        <div class="action-row"><button class="btn ${kind === 'gather' ? 'btn-gold' : 'btn-red'} btn-xl" data-act="go" ${!valid.ok ? 'disabled' : ''}>${ink(kind === 'gather' ? 'i_gather' : 'i_swords', 20)} ${kind === 'gather' ? 'Gather' : 'March'}</button></div>`;
 
       const setTroop = (k: string, v: number) => {
         const max = s.troops[k] ?? 0;
@@ -270,7 +279,7 @@ export function openMarch(ctx: UiCtx, targetId: string, kind: 'attack' | 'gather
         },
         go: () => {
           if (ctx.run((st) => sendMarch(st, { kind, targetId, commanderId, troops: sel }), sfx.march)) {
-            toast(kind === 'gather' ? 'Gatherers dispatched' : `${commanderId ? COMMANDER_BY_ID[commanderId].name : 'Army'} marches to battle!`, 'good', 'march_token');
+            toast(kind === 'gather' ? 'Gatherers set out' : `${commanderId ? COMMANDER_BY_ID[commanderId].name : 'The army'} marches to war`, 'good', 'march_token');
             h.close();
           }
         },
@@ -283,49 +292,60 @@ export function openMarch(ctx: UiCtx, targetId: string, kind: 'attack' | 'gather
 
 export function openTavern(ctx: UiCtx): void {
   let reveal = '';
+  let shaking: 'silver' | 'gold' | null = null;
   openModal({
-    title: 'Tavern',
-    dark: true,
+    title: 'The Tavern',
+    seal: '酒',
+    kicker: 'Recruit · Chests',
     live: true,
-    render: (body) => {
+    render: (body, h) => {
       const s = ctx.game.state;
-      const silverFree = s.tavern.silverFreeAt <= s.time;
-      const goldFree = s.tavern.goldFreeAt <= s.time;
-      const chest = (kind: 'silver' | 'gold', free: boolean, at: number, keys: number) => `
-        <div class="chest ${kind}">
+      const chest = (kind: 'silver' | 'gold', at: number, keys: number) => {
+        const free = at <= s.time;
+        return `
+        <div class="chest ${kind} ${shaking === kind ? 'shake' : ''}">
+          <div class="chest-enso"></div>
+          <div class="kicker">${kind === 'silver' ? 'Common fortune' : 'Royal fortune'}</div>
           <div class="chest-title">${kind === 'silver' ? 'Silver Chest' : 'Gold Chest'}</div>
-          <img class="chest-img" src="${assetUrl('ic_chest')}">
-          <div class="muted">${kind === 'silver' ? 'Epic commanders, sculptures & supplies' : 'Legendary commanders, many sculptures & gems'}</div>
+          <img class="chest-img" src="${assetUrl('ic_chest')}" alt="">
+          <div class="muted" style="font-style:italic">${kind === 'silver' ? 'Epic generals, sculptures and supplies' : 'Legendary generals, many sculptures and gems'}</div>
           <div class="spacer"></div>
-          ${free ? `<button class="btn btn-green" data-act="open" data-kind="${kind}">Open FREE</button>` : `<button class="btn btn-gold" data-act="open" data-kind="${kind}" ${keys <= 0 ? 'disabled' : ''}>${icon(kind === 'silver' ? 'ic_key_silver' : 'ic_key_gold')} Open (${keys})</button>
-             <div class="muted" style="margin-top:6px">Free in <span data-end="${at}"></span></div>`}
+          ${free ? `<button class="btn btn-gold" data-act="open" data-kind="${kind}">Open · free</button>` : `<button class="btn" data-act="open" data-kind="${kind}" ${keys <= 0 ? 'disabled' : ''}>${icon(kind === 'silver' ? 'ic_key_silver' : 'ic_key_gold', 18)} Open · ${keys}</button>
+             <div class="muted" style="margin-top:8px;font-size:11.5px">Free again in <span class="num" data-end="${at}"></span></div>`}
         </div>`;
+      };
       body.innerHTML = `
         <div class="chests">
-          ${chest('silver', silverFree, s.tavern.silverFreeAt, s.items.silver_key ?? 0)}
-          ${chest('gold', goldFree, s.tavern.goldFreeAt, s.items.gold_key ?? 0)}
+          ${chest('silver', s.tavern.silverFreeAt, s.items.silver_key ?? 0)}
+          ${chest('gold', s.tavern.goldFreeAt, s.items.gold_key ?? 0)}
         </div>
-        <div class="muted center" style="margin-top:8px">Free silver chest every ${SILVER_FREE_MS / 3600_000}h · free gold chest every ${GOLD_FREE_MS / 3600_000}h (game time)</div>
+        <div class="muted center" style="margin-top:10px;font-size:11.5px">A free silver chest every ${SILVER_FREE_MS / 3600_000} hours · a free gold chest every ${GOLD_FREE_MS / 3600_000} hours</div>
         ${reveal}`;
       onAct(body, {
         open: (t) => {
           const kind = t.dataset.kind as 'silver' | 'gold';
-          let out: ReturnType<typeof openChest> | null = null;
-          const ok = ctx.run((st) => {
-            out = openChest(st, kind, ctx.game.rng);
-            return out.ok ? { ok: true } : out;
-          }, sfx.chest);
-          if (ok && out && (out as { ok: boolean }).ok) {
-            const r = out as Extract<ReturnType<typeof openChest>, { ok: true }>;
-            reveal = `
-              ${r.recruited ? `<div class="recruit"><h3 class="sec">New commander recruited!</h3>${cmdCard(ctx, r.recruited)}</div>` : ''}
-              <h3 class="sec">Rewards</h3><div class="reveal">${revealItems(r.reward)}</div>`;
-            if (r.recruited) {
-              sfx.fanfare();
-              toast(`${COMMANDER_BY_ID[r.recruited].name} has joined you!`, 'good', COMMANDER_BY_ID[r.recruited].portrait);
+          shaking = kind;
+          h.refresh();
+          sfx.chest();
+          setTimeout(() => {
+            shaking = null;
+            let out: ReturnType<typeof openChest> | null = null;
+            const ok = ctx.run((st) => {
+              out = openChest(st, kind, ctx.game.rng);
+              return out.ok ? { ok: true } : out;
+            });
+            if (ok && out && (out as { ok: boolean }).ok) {
+              const r = out as Extract<ReturnType<typeof openChest>, { ok: true }>;
+              reveal = `
+                ${r.recruited ? `<div class="recruit"><h3 class="sec">A new general answers the call</h3>${cmdCard(ctx, r.recruited)}</div>` : ''}
+                <h3 class="sec">Spoils</h3><div class="reveal">${revealItems(r.reward)}</div>`;
+              if (r.recruited) {
+                sfx.fanfare();
+                toast(`${COMMANDER_BY_ID[r.recruited].name} has joined you`, 'good', COMMANDER_BY_ID[r.recruited].portrait);
+              }
             }
             ctx.game.emitChange();
-          }
+          }, 600);
         },
         cmd: (t) => openCommander(ctx, t.dataset.id!),
       });
@@ -333,31 +353,16 @@ export function openTavern(ctx: UiCtx): void {
   });
 }
 
-function revealItems(r: import('../../game/state').Reward): string {
+function revealItems(r: Reward): string {
   const out: string[] = [];
   let i = 0;
   const card = (img: string, name: string, qty: string) =>
-    `<div class="item" style="animation-delay:${i++ * 0.08}s"><img src="${assetUrl(img)}"><div class="i-name">${esc(name)}</div><div class="qty">${qty}</div></div>`;
-  for (const k in r.sculptures ?? {}) out.push(card(COMMANDER_BY_ID[k].portrait, `${COMMANDER_BY_ID[k].name} Sculpture`, `×${r.sculptures![k]}`));
+    `<div class="item" style="animation-delay:${i++ * 0.09}s"><img src="${assetUrl(img)}" alt=""><div class="i-name">${esc(name)}</div><div class="qty">${qty}</div></div>`;
+  for (const k in r.sculptures ?? {}) out.push(card('ic_sculpture', `${COMMANDER_BY_ID[k].name}`, `×${r.sculptures![k]}`));
   for (const k in r.items ?? {}) {
     const n = r.items![k as keyof typeof r.items] ?? 0;
     if (n > 0) out.push(card(ITEMS[k as keyof typeof ITEMS].icon, ITEMS[k as keyof typeof ITEMS].name, `×${n}`));
   }
   if (r.res?.gems) out.push(card('ic_gems', 'Gems', `×${r.res.gems}`));
-  return out.join('') || rewardHtml(r);
-}
-
-export function troopSummary(t: Troops): string {
-  return Object.entries(t)
-    .filter(([, n]) => n > 0)
-    .map(([k, n]) => {
-      const [ty, tier] = k.split('_');
-      return `${icon(TROOP_SPRITES[ty as TroopType], 20)} ${fmtFull(n)} T${tier}`;
-    })
-    .join(' · ');
-}
-
-export function troopStatsLine(type: TroopType, tier: number): string {
-  const st = troopStats(type, tier);
-  return `ATK ${Math.round(st.atk)} · DEF ${Math.round(st.def)} · HP ${Math.round(st.hp)}`;
+  return out.join('');
 }

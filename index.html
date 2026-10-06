@@ -3,15 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#0f1626" />
+    <meta name="theme-color" content="#0b0b0c" />
     <title>Realm of Kings</title>
-    <link rel="icon" href="./assets/city_hall.webp" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
+    <link rel="icon" href="./assets/ink/seal_solid.webp" />
+    <link rel="preload" href="./fonts/KaiseiTokumin-Bold.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="./fonts/Cinzel.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="./assets/ink/title_key.webp" as="image" />
   </head>
   <body>
     <div id="app">
@@ -23,20 +20,37 @@
       <div id="modal-root"></div>
       <div id="toasts"></div>
       <div id="transition"></div>
+
       <div id="title-screen">
-        <div class="title-bg"></div>
-        <div class="title-vignette"></div>
-        <div class="title-content">
-          <div class="logo">
-            <div class="logo-small">Chronicles of the</div>
-            <div class="logo-main">REALM OF KINGS</div>
-            <div class="logo-sub">Build · Conquer · Rule</div>
+        <img class="t-layer t-bg" src="./assets/ink/title_key.webp" alt="" />
+        <video class="t-layer t-video" poster="./assets/ink/title_key.webp" muted loop playsinline autoplay preload="auto">
+          <source src="./assets/ink/title_loop.webm" type="video/webm" />
+          <source src="./assets/ink/title_loop.mp4" type="video/mp4" />
+        </video>
+        <img class="t-layer t-shards" src="./assets/ink/gold_shards.webp" alt="" />
+        <img class="t-layer t-mist" src="./assets/ink/ink_mist.webp" alt="" />
+        <div class="t-layer t-vignette"></div>
+        <div class="t-ui">
+          <div class="t-brand">
+            <img src="./assets/ink/ink_enso_gold.webp" alt="" />
+            <span>Chronicles<br />of the Crown</span>
           </div>
-          <div class="loader"><div class="loader-fill"></div></div>
-          <div class="loader-text">Summoning the realm…</div>
-          <button class="btn btn-gold btn-xl start-btn hidden">Enter the Realm</button>
-          <div class="title-foot">Art generated with Higgsfield AI · An original strategy game</div>
+          <div class="t-title">
+            <span class="echo">王国</span>
+            <span class="small">The chronicle of</span>
+            <h1>Realm<br /><em>of</em> Kings</h1>
+            <span class="brush"></span>
+            <span class="seal">王</span>
+          </div>
+          <p class="t-tag">Raise a city from the wilds. Lead legendary generals. Bring every banner of the realm under one crown.</p>
+          <div class="t-load">
+            <div class="track"></div>
+            <div class="fill"></div>
+            <div class="kicker cap">Grinding the ink…</div>
+          </div>
+          <button class="t-enter hidden"><b>Enter</b><span class="line"></span><span class="arrow">→</span><small style="position:absolute;right:56px;bottom:6px;font-size:9px;font-style:italic;color:#4a3f29"></small></button>
         </div>
+        <div class="t-foot"><span>Art painted with Higgsfield</span><span>An original strategy game</span></div>
       </div>
     </div>
     <script type="module" src="/src/main.ts"></script>

@@ -1,13 +1,15 @@
 import { img } from '../assets';
-import { BUILDINGS } from '../data/buildings';
+import { BUILDINGS, type BuildingType } from '../data/buildings';
 import { CITY_GRID, PLOTS, type Plot } from '../data/layout';
 import type { Game } from '../game/game';
 import { cityHallLevel, plotUnlockLevel, producerCap, storedAmount, trainingJob } from '../game/logic';
 import { Camera } from './camera';
-import { Fx, mirroredPattern } from './fx';
+import { Fx, inkLabel, inkTimer, mirroredPattern } from './fx';
 
 export const TW = 128;
 export const TH = 64;
+/** one grid tile in the un-projected ground plane (see GROUND matrix) */
+const G = 64;
 
 export function isoToWorld(gx: number, gy: number): { x: number; y: number } {
   return { x: ((gx - gy) * TW) / 2, y: ((gx + gy) * TH) / 2 };
@@ -18,55 +20,90 @@ interface Drawable {
   draw: () => void;
 }
 
-interface Villager {
+interface Walker {
   path: [number, number][];
   seg: number;
   t: number;
   speed: number;
-  color: string;
+  sprite: string;
 }
 
+/** gx0, gy0, gx1, gy1 rectangles (in tiles) of dirt road */
 const ROADS: [number, number, number, number][] = [
-  // gx0, gy0, gx1, gy1 rectangles (in tiles) of dirt road
-  [13.6, 16, 15.4, 23.2], // plaza -> gate
-  [5, 14, 12, 15.2], // west road
-  [16, 14, 22, 15.2], // east road
-  [14, 4.5, 15.2, 12], // north road
+  [13.7, 17.8, 15.3, 24.5], // plaza -> gate
+  [4.6, 14, 11, 15.4], // west road
+  [17.8, 14, 23.4, 15.4], // east road
+  [14, 4.2, 15.4, 11], // north road
 ];
+const PLAZA: [number, number, number, number] = [10.6, 10.6, 18.4, 18.4];
 
 const WALL_MIN = 2.2;
 const WALL_MAX = 25.6;
+const GATE: [number, number] = [12.5, 15.7];
+
+/** Buildings that send up chimney smoke, with the chimney position inside their sprite box. */
+const CHIMNEYS: Partial<Record<BuildingType, [number, number]>> = {
+  tavern: [0.62, 0.12],
+  barracks: [0.56, 0.08],
+  siege_workshop: [0.66, 0.1],
+  hospital: [0.4, 0.16],
+  lumber_mill: [0.36, 0.2],
+  storehouse: [0.5, 0.14],
+};
 
 /** Decorative trees ringing the city, generated once. */
 function forestRing(): { gx: number; gy: number; s: number; kind: string }[] {
   const out: { gx: number; gy: number; s: number; kind: string }[] = [];
   let seed = 7;
   const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  for (let i = 0; i < 70; i++) {
+  for (let i = 0; i < 80; i++) {
     const side = i % 4;
     const along = -2 + r() * 32;
-    const out1 = -1.5 - r() * 5;
+    const out1 = -1.6 - r() * 5;
     let gx = 0;
     let gy = 0;
     if (side === 0) [gx, gy] = [along, out1];
     if (side === 1) [gx, gy] = [out1, along];
     if (side === 2) [gx, gy] = [along, CITY_GRID - out1 - 1];
     if (side === 3) [gx, gy] = [CITY_GRID - out1 - 1, along];
-    // keep the front (bottom) edges sparse so the camera view stays open
     if ((side === 2 || side === 3) && r() < 0.55) continue;
     out.push({ gx, gy, s: 1.6 + r() * 1.4, kind: r() < 0.12 ? 'mountain' : 'forest' });
   }
   return out;
 }
 
+/** Wall runs along the four edges of the city diamond, split into tile-able segments. */
+function wallSegments(): { a: [number, number]; b: [number, number]; mirror: boolean }[] {
+  const segs: { a: [number, number]; b: [number, number]; mirror: boolean }[] = [];
+  const run = (fixed: 'gx' | 'gy', at: number, from: number, to: number, mirror: boolean) => {
+    const n = Math.max(1, Math.round((to - from) / 3.9));
+    const step = (to - from) / n;
+    for (let i = 0; i < n; i++) {
+      const s0 = from + step * i;
+      const s1 = s0 + step;
+      segs.push(fixed === 'gy' ? { a: [s0, at], b: [s1, at], mirror } : { a: [at, s0], b: [at, s1], mirror });
+    }
+  };
+  run('gy', WALL_MIN, WALL_MIN, WALL_MAX, false); // top-right edge
+  run('gx', WALL_MIN, WALL_MIN, WALL_MAX, true); // top-left edge
+  run('gy', WALL_MAX, WALL_MIN, GATE[0], false); // bottom-left edge, left of the gate
+  run('gy', WALL_MAX, GATE[1], WALL_MAX, false); // bottom-left edge, right of the gate
+  run('gx', WALL_MAX, WALL_MIN, WALL_MAX, true); // bottom-right edge
+  return segs;
+}
+
 export class CityView {
   camera: Camera;
   fx = new Fx();
   private ctx: CanvasRenderingContext2D;
-  private grass: CanvasPattern | null = null;
+  private patterns: Record<string, CanvasPattern | null> = {};
   private trees = forestRing();
-  private villagers: Villager[] = [];
-  private clouds = Array.from({ length: 6 }, (_, i) => ({ x: i * 700 - 1800, y: -400 + ((i * 397) % 1600), s: 0.8 + ((i * 7) % 5) / 6 }));
+  private walls = wallSegments();
+  private walkers: Walker[] = [];
+  private mists = Array.from({ length: 7 }, (_, i) => ({ x: i * 620 - 2200, y: -300 + ((i * 433) % 1700), s: 0.9 + ((i * 7) % 5) / 5, v: 0.008 + (i % 3) * 0.004 }));
+  private birds = { x: -2600, y: 400, t: 0, next: 4000 };
+  private chimneyClock: Record<string, number> = {};
+  private bounces: Record<string, number> = {};
   hoverPlot: string | null = null;
   selectedPlot: string | null = null;
   private time = 0;
@@ -77,27 +114,29 @@ export class CityView {
     this.ctx = canvas.getContext('2d')!;
     this.camera = new Camera(canvas, (x, y) => this.tap(x, y), (x, y) => this.hover(x, y));
     const c = isoToWorld(14, 14);
-    this.camera.centerOn(c.x, c.y + 40);
+    // bias the view right so the city clears the rail and works column on the left
+    this.camera.centerOn(c.x - 210, c.y + 30);
     this.camera.zoom = 0.62;
     this.camera.minZoom = 0.28;
     this.camera.maxZoom = 1.5;
     const a = isoToWorld(0, CITY_GRID);
     const b = isoToWorld(CITY_GRID, 0);
     this.camera.bounds = { minX: a.x, maxX: b.x, minY: -200, maxY: isoToWorld(CITY_GRID, CITY_GRID).y };
-    this.spawnVillagers();
+    this.spawnWalkers();
   }
 
-  private spawnVillagers(): void {
+  private spawnWalkers(): void {
     const paths: [number, number][][] = [
-      [[14.5, 22.5], [14.5, 16.5], [11, 14.6], [6, 14.6]],
-      [[6, 14.6], [12, 14.6], [14.5, 16.5], [14.5, 22.5]],
-      [[21, 14.6], [16.5, 14.6], [14.6, 11.5], [14.6, 5]],
-      [[14.6, 5], [14.6, 11.5], [16.5, 14.6], [21, 14.6]],
-      [[14.5, 22.5], [14.5, 17], [16.5, 14.6], [21, 14.6]],
+      [[14.5, 24], [14.5, 17.5], [11, 14.7], [5, 14.7]],
+      [[5, 14.7], [11, 14.7], [14.5, 17.5], [14.5, 24]],
+      [[23, 14.7], [17.8, 14.7], [14.7, 11], [14.7, 4.6]],
+      [[14.7, 4.6], [14.7, 11], [17.8, 14.7], [23, 14.7]],
+      [[14.5, 24], [14.5, 18], [17.8, 14.7], [23, 14.7]],
+      [[11, 11], [18, 11], [18, 18], [11, 18], [11, 11]],
     ];
-    const colors = ['#2f5fb3', '#b33a2f', '#d8b046', '#4f8a3a', '#7b4ba8', '#e8e1d0'];
-    for (let i = 0; i < 14; i++) {
-      this.villagers.push({ path: paths[i % paths.length], seg: 0, t: (i * 0.37) % 1, speed: 0.0006 + (i % 4) * 0.00015, color: colors[i % colors.length] });
+    const sprites = ['unit_infantry', 'unit_archer', 'unit_infantry', 'unit_cavalry', 'unit_archer', 'unit_infantry'];
+    for (let i = 0; i < 12; i++) {
+      this.walkers.push({ path: paths[i % paths.length], seg: 0, t: (i * 0.37) % 1, speed: 0.0004 + (i % 4) * 0.00012, sprite: sprites[i % sprites.length] });
     }
   }
 
@@ -128,7 +167,7 @@ export class CityView {
     for (const p of PLOTS) {
       const b = this.bubblePos(p);
       if (!b) continue;
-      if (Math.hypot(w.x - b.x, w.y - b.y) < 40 / Math.min(1, this.camera.zoom)) return p.id;
+      if (Math.hypot(w.x - b.x, w.y - b.y) < 42 / Math.min(1, this.camera.zoom)) return p.id;
     }
     return null;
   }
@@ -166,6 +205,18 @@ export class CityView {
     this.camera.centerOn(r.cx, r.bottom - r.h * 0.4, true);
   }
 
+  /** Celebrate a finished upgrade: the building bounces, a seal is stamped, gold leaf flies. */
+  levelUp(plotId: string): void {
+    const p = PLOTS.find((x) => x.id === plotId);
+    if (!p) return;
+    const r = this.plotRect(p);
+    this.bounces[plotId] = this.time;
+    this.fx.wave(r.cx, r.bottom - r.h * 0.06, r.w * 1.3);
+    this.fx.leaves(r.cx, r.y + r.h * 0.35, 36, 1.5);
+    this.fx.dust(r.cx, r.bottom - 10, 8, 2);
+    setTimeout(() => this.fx.stamp(r.cx + r.w * 0.28, r.y + r.h * 0.2, '昇', 74), 220);
+  }
+
   private bubblePos(p: Plot): { x: number; y: number; kind: 'res' | 'idle' } | null {
     const s = this.game.state;
     const b = s.buildings[p.id];
@@ -175,10 +226,10 @@ export class CityView {
     if (def.producer) {
       const stored = storedAmount(s, p.id);
       if (stored < Math.max(50, producerCap(s, p.id) * 0.04)) return null;
-      return { x: r.cx, y: r.y + r.h * 0.18, kind: 'res' };
+      return { x: r.cx, y: r.y + r.h * 0.16, kind: 'res' };
     }
     if (def.trains && !trainingJob(s, def.trains) && !s.jobs.some((j) => j.kind === 'build' && j.target === p.id)) {
-      return { x: r.cx, y: r.y + r.h * 0.18, kind: 'idle' };
+      return { x: r.cx, y: r.y + r.h * 0.16, kind: 'idle' };
     }
     return null;
   }
@@ -193,6 +244,11 @@ export class CityView {
     }
   }
 
+  private pattern(name: string): CanvasPattern | null {
+    if (!this.patterns[name]) this.patterns[name] = mirroredPattern(this.ctx, name);
+    return this.patterns[name];
+  }
+
   render(dt: number): void {
     this.time += dt;
     this.resize();
@@ -202,18 +258,12 @@ export class CityView {
     const dpr = this.canvas.width / Math.max(1, this.canvas.clientWidth);
     const cam = this.camera;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = '#3d6b2a';
+    ctx.fillStyle = '#2f4a22';
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.setTransform(dpr * cam.zoom, 0, 0, dpr * cam.zoom, dpr * (cam.width / 2 - cam.x * cam.zoom), dpr * (cam.height / 2 - cam.y * cam.zoom));
-
-    this.grass ??= mirroredPattern(ctx, 'bg_world');
-    if (this.grass) {
-      ctx.fillStyle = this.grass;
-      ctx.fillRect(-4000, -1600, 8000, 4400);
-    }
+    ctx.imageSmoothingQuality = 'high';
 
     this.drawGround(ctx);
-    this.drawWalls(ctx, 'back');
 
     const items: Drawable[] = [];
     for (const t of this.trees) {
@@ -224,7 +274,6 @@ export class CityView {
       const h = (w * im.naturalHeight) / im.naturalWidth;
       items.push({ depth: t.gx + t.gy, draw: () => ctx.drawImage(im, p.x - w / 2, p.y - h * 0.8, w, h) });
     }
-    // fountain on the plaza
     const fountain = img('fountain');
     if (fountain) {
       const p = isoToWorld(17.6, 18.2);
@@ -232,148 +281,94 @@ export class CityView {
       const h = (w * fountain.naturalHeight) / fountain.naturalWidth;
       items.push({ depth: 35.8, draw: () => ctx.drawImage(fountain, p.x - w / 2, p.y - h * 0.75, w, h) });
     }
-    for (const p of PLOTS) items.push({ depth: p.gx + p.gy + BUILDINGS[p.type].size * 2 - 0.5, draw: () => this.drawPlot(ctx, p) });
-    for (const v of this.villagers) {
-      const pos = this.villagerPos(v, dt);
-      items.push({ depth: pos.gx + pos.gy, draw: () => this.drawVillager(ctx, pos.gx, pos.gy, v.color) });
+    for (const seg of this.walls) {
+      const mid = (seg.a[0] + seg.b[0]) / 2 + (seg.a[1] + seg.b[1]) / 2;
+      items.push({ depth: mid + 0.2, draw: () => this.drawWallSeg(ctx, seg) });
     }
-    items.sort((a, b) => a.depth - b.depth);
-    for (const it of items) it.draw();
-    this.drawWalls(ctx, 'front');
-    // corner towers sit on top of the wall joints
     const tower = img('watchtower');
     if (tower) {
       for (const [gx, gy] of [[WALL_MIN, WALL_MIN], [WALL_MAX, WALL_MIN], [WALL_MIN, WALL_MAX], [WALL_MAX, WALL_MAX]]) {
         const p = isoToWorld(gx, gy);
         const w = TW * 1.7;
         const h = (w * tower.naturalHeight) / tower.naturalWidth;
-        ctx.drawImage(tower, p.x - w / 2, p.y - h * 0.82, w, h);
+        items.push({ depth: gx + gy + 0.9, draw: () => ctx.drawImage(tower, p.x - w / 2, p.y - h * 0.82, w, h) });
       }
     }
+    for (const p of PLOTS) items.push({ depth: p.gx + p.gy + BUILDINGS[p.type].size * 2 - 0.5, draw: () => this.drawPlot(ctx, p) });
+    for (const v of this.walkers) {
+      const pos = this.walkerPos(v, dt);
+      items.push({ depth: pos.gx + pos.gy, draw: () => this.drawWalker(ctx, v, pos) });
+    }
+    items.sort((a, b) => a.depth - b.depth);
+    for (const it of items) it.draw();
 
+    this.emitSmoke(dt);
+    this.fx.drawBack(ctx);
     for (const p of PLOTS) this.drawOverlay(ctx, p);
     this.fx.draw(ctx, cam.zoom);
-    this.drawClouds(ctx, dt);
+    this.drawSky(ctx, dt);
   }
 
-  private quad(ctx: CanvasRenderingContext2D, gx0: number, gy0: number, gx1: number, gy1: number): void {
-    const a = isoToWorld(gx0, gy0);
-    const b = isoToWorld(gx1, gy0);
-    const c = isoToWorld(gx1, gy1);
-    const d = isoToWorld(gx0, gy1);
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.lineTo(c.x, c.y);
-    ctx.lineTo(d.x, d.y);
-    ctx.closePath();
+  /** Paint a texture onto the iso ground plane over a tile rectangle. */
+  private groundRect(ctx: CanvasRenderingContext2D, gx0: number, gy0: number, gx1: number, gy1: number, fill: string | CanvasPattern, edge?: string): void {
+    ctx.save();
+    ctx.transform(1, 0.5, -1, 0.5, 0, 0);
+    ctx.fillStyle = fill;
+    ctx.fillRect(gx0 * G, gy0 * G, (gx1 - gx0) * G, (gy1 - gy0) * G);
+    if (edge) {
+      ctx.strokeStyle = edge;
+      ctx.lineWidth = 9;
+      ctx.filter = 'blur(5px)';
+      ctx.strokeRect(gx0 * G, gy0 * G, (gx1 - gx0) * G, (gy1 - gy0) * G);
+      ctx.filter = 'none';
+    }
+    ctx.restore();
   }
 
   private drawGround(ctx: CanvasRenderingContext2D): void {
-    // inner city: warmer, well-kept grass
-    this.quad(ctx, WALL_MIN, WALL_MIN, WALL_MAX, WALL_MAX);
-    ctx.fillStyle = 'rgba(190, 220, 90, 0.12)';
-    ctx.fill();
+    const grass = this.pattern('bg_world');
+    if (grass) this.groundRect(ctx, -14, -14, CITY_GRID + 14, CITY_GRID + 14, grass);
+    // warmer, tended grass inside the walls
+    this.groundRect(ctx, WALL_MIN, WALL_MIN, WALL_MAX, WALL_MAX, 'rgba(214,226,120,0.10)');
 
-    // roads
-    for (const [x0, y0, x1, y1] of ROADS) {
-      this.quad(ctx, x0, y0, x1, y1);
-      ctx.fillStyle = '#b8935c';
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(90,60,30,0.35)';
-      ctx.lineWidth = 3;
-      ctx.stroke();
-    }
-    // cobbled plaza around the city hall
-    this.quad(ctx, 10.6, 10.6, 18.4, 18.4);
-    ctx.fillStyle = '#a99d88';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(70,60,50,0.5)';
-    ctx.lineWidth = 4;
-    ctx.stroke();
-    ctx.strokeStyle = 'rgba(80,70,60,0.22)';
-    ctx.lineWidth = 1.5;
-    for (let i = 11; i < 18.4; i += 0.5) {
-      const a = isoToWorld(i, 10.6);
-      const b = isoToWorld(i, 18.4);
-      const c = isoToWorld(10.6, i);
-      const d = isoToWorld(18.4, i);
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.moveTo(c.x, c.y);
-      ctx.lineTo(d.x, d.y);
-      ctx.stroke();
-    }
-    // soft plot shadows so buildings sit in the ground
+    const dirt = this.pattern('tex_dirt');
+    const cobble = this.pattern('tex_cobble');
+    for (const [x0, y0, x1, y1] of ROADS) this.groundRect(ctx, x0, y0, x1, y1, dirt ?? '#a98654', 'rgba(52,36,14,0.55)');
+    this.groundRect(ctx, ...PLAZA, cobble ?? '#a99d88', 'rgba(40,32,24,0.6)');
+
+    // soft contact shadows so buildings sit in the ground
+    ctx.save();
+    ctx.transform(1, 0.5, -1, 0.5, 0, 0);
+    ctx.filter = 'blur(10px)';
+    ctx.fillStyle = 'rgba(30,24,10,0.28)';
     for (const p of PLOTS) {
       const size = BUILDINGS[p.type].size;
-      this.quad(ctx, p.gx - 0.15, p.gy - 0.15, p.gx + size + 0.15, p.gy + size + 0.15);
-      ctx.fillStyle = 'rgba(60,45,20,0.16)';
-      ctx.fill();
+      if (this.game.state.buildings[p.id].level > 0) ctx.fillRect((p.gx - 0.1) * G, (p.gy - 0.1) * G, (size + 0.3) * G, (size + 0.3) * G);
     }
+    ctx.filter = 'none';
+    ctx.restore();
   }
 
-  private drawWalls(ctx: CanvasRenderingContext2D, layer: 'back' | 'front'): void {
-    const H = 34;
-    const segs: [number, number, number, number][] =
-      layer === 'back'
-        ? [
-            [WALL_MIN, WALL_MIN, WALL_MAX, WALL_MIN],
-            [WALL_MIN, WALL_MIN, WALL_MIN, WALL_MAX],
-          ]
-        : [
-            [WALL_MIN, WALL_MAX, 12.6, WALL_MAX],
-            [15.6, WALL_MAX, WALL_MAX, WALL_MAX],
-            [WALL_MAX, WALL_MIN, WALL_MAX, WALL_MAX],
-          ];
-    for (const [x0, y0, x1, y1] of segs) {
-      const a = isoToWorld(x0, y0);
-      const b = isoToWorld(x1, y1);
-      // body
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.lineTo(b.x, b.y - H);
-      ctx.lineTo(a.x, a.y - H);
-      ctx.closePath();
-      const g = ctx.createLinearGradient(0, a.y - H, 0, a.y);
-      g.addColorStop(0, '#cfc6b4');
-      g.addColorStop(1, '#8b8070');
-      ctx.fillStyle = g;
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(50,40,30,0.55)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      // walkway top
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y - H);
-      ctx.lineTo(b.x, b.y - H);
-      ctx.lineWidth = 9;
-      ctx.strokeStyle = '#e2dccd';
-      ctx.stroke();
-      // crenellations
-      const n = Math.floor(Math.hypot(b.x - a.x, b.y - a.y) / 22);
-      ctx.fillStyle = '#d9d1bf';
-      for (let i = 0; i < n; i += 2) {
-        const t = i / n;
-        const x = a.x + (b.x - a.x) * t;
-        const y = a.y + (b.y - a.y) * t - H;
-        ctx.fillRect(x - 5, y - 12, 10, 10);
-      }
-      // stone courses
-      ctx.strokeStyle = 'rgba(60,50,40,0.25)';
-      ctx.lineWidth = 1;
-      for (let k = 1; k < 3; k++) {
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y - (H * k) / 3);
-        ctx.lineTo(b.x, b.y - (H * k) / 3);
-        ctx.stroke();
-      }
-    }
+  private drawWallSeg(ctx: CanvasRenderingContext2D, seg: { a: [number, number]; b: [number, number]; mirror: boolean }): void {
+    const im = img('ink/wall_seg');
+    if (!im) return;
+    const A = isoToWorld(...seg.a);
+    const B = isoToWorld(...seg.b);
+    const dx = Math.abs(B.x - A.x);
+    const midX = (A.x + B.x) / 2;
+    const midY = (A.y + B.y) / 2;
+    const w = dx * 1.08;
+    const s = w / im.naturalWidth;
+    const h = im.naturalHeight * s;
+    ctx.save();
+    ctx.translate(midX, midY);
+    if (seg.mirror) ctx.scale(-1, 1);
+    // the sprite's base line passes ~63% down its height at the middle
+    ctx.drawImage(im, -w / 2, -h * 0.63, w, h);
+    ctx.restore();
   }
 
-  private villagerPos(v: Villager, dt: number): { gx: number; gy: number } {
+  private walkerPos(v: Walker, dt: number): { gx: number; gy: number; dir: number } {
     v.t += v.speed * dt;
     if (v.t >= 1) {
       v.t = 0;
@@ -382,24 +377,47 @@ export class CityView {
     }
     const [x0, y0] = v.path[v.seg];
     const [x1, y1] = v.path[v.seg + 1];
-    return { gx: x0 + (x1 - x0) * v.t, gy: y0 + (y1 - y0) * v.t };
+    const a = isoToWorld(x0, y0);
+    const b = isoToWorld(x1, y1);
+    return { gx: x0 + (x1 - x0) * v.t, gy: y0 + (y1 - y0) * v.t, dir: b.x >= a.x ? 1 : -1 };
   }
 
-  private drawVillager(ctx: CanvasRenderingContext2D, gx: number, gy: number, color: string): void {
-    const p = isoToWorld(gx, gy);
-    const bob = Math.abs(Math.sin(this.time / 120 + gx * 3)) * 2;
-    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  private drawWalker(ctx: CanvasRenderingContext2D, v: Walker, pos: { gx: number; gy: number; dir: number }): void {
+    const p = isoToWorld(pos.gx, pos.gy);
+    const im = img(v.sprite);
+    const bob = Math.abs(Math.sin(this.time / 110 + pos.gx * 3)) * 2.5;
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
     ctx.beginPath();
-    ctx.ellipse(p.x, p.y, 7, 3.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(p.x, p.y, 11, 4.5, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.roundRect(p.x - 4.5, p.y - 17 - bob, 9, 14, 3);
-    ctx.fill();
-    ctx.fillStyle = '#f0c9a0';
-    ctx.beginPath();
-    ctx.arc(p.x, p.y - 21 - bob, 4.2, 0, Math.PI * 2);
-    ctx.fill();
+    if (!im) return;
+    const s = v.sprite === 'unit_cavalry' ? 46 : 36;
+    ctx.save();
+    ctx.translate(p.x, p.y - bob);
+    ctx.scale(pos.dir, 1);
+    ctx.drawImage(im, -s / 2, -s * 0.92, s, s);
+    ctx.restore();
+  }
+
+  private emitSmoke(dt: number): void {
+    const s = this.game.state;
+    for (const p of PLOTS) {
+      const ch = CHIMNEYS[p.type];
+      if (!ch || s.buildings[p.id].level <= 0) continue;
+      this.chimneyClock[p.id] = (this.chimneyClock[p.id] ?? Math.random() * 600) - dt;
+      if (this.chimneyClock[p.id] > 0) continue;
+      this.chimneyClock[p.id] = 520 + Math.random() * 420;
+      const r = this.plotRect(p);
+      this.fx.smoke(r.x + r.w * ch[0], r.y + r.h * ch[1], 1 + BUILDINGS[p.type].size * 0.15);
+    }
+    // builders raise dust while they work
+    for (const j of s.jobs) {
+      if (j.kind !== 'build' || Math.random() > dt / 260) continue;
+      const p = PLOTS.find((x) => x.id === j.target);
+      if (!p) continue;
+      const r = this.plotRect(p);
+      this.fx.dust(r.cx + (Math.random() - 0.5) * r.w * 0.5, r.bottom - r.h * 0.12, 1, 1.4);
+    }
   }
 
   private drawPlot(ctx: CanvasRenderingContext2D, p: Plot): void {
@@ -412,31 +430,44 @@ export class CityView {
 
     if (b.level <= 0 && !upgrading) {
       const unlocked = cityHallLevel(s) >= plotUnlockLevel(p.id);
-      this.quad(ctx, p.gx + 0.15, p.gy + 0.15, p.gx + size - 0.15, p.gy + size - 0.15);
-      ctx.fillStyle = unlocked ? 'rgba(150,110,60,0.75)' : 'rgba(80,80,80,0.35)';
-      ctx.fill();
-      ctx.setLineDash([10, 8]);
-      ctx.lineWidth = highlighted ? 5 : 3;
-      ctx.strokeStyle = unlocked ? (highlighted ? '#ffe07a' : 'rgba(255,230,160,0.85)') : 'rgba(255,255,255,0.35)';
-      ctx.stroke();
-      ctx.setLineDash([]);
+      ctx.save();
+      ctx.transform(1, 0.5, -1, 0.5, 0, 0);
+      ctx.fillStyle = unlocked ? 'rgba(48,36,20,0.42)' : 'rgba(20,20,20,0.12)';
+      ctx.fillRect((p.gx + 0.2) * G, (p.gy + 0.2) * G, (size - 0.4) * G, (size - 0.4) * G);
+      ctx.setLineDash([12, 9]);
+      ctx.lineWidth = highlighted ? 3 : 1.6;
+      ctx.strokeStyle = unlocked ? (highlighted ? '#f6e7c4' : 'rgba(246,231,196,0.75)') : highlighted ? 'rgba(246,231,196,0.6)' : 'rgba(246,231,196,0.16)';
+      ctx.strokeRect((p.gx + 0.2) * G, (p.gy + 0.2) * G, (size - 0.4) * G, (size - 0.4) * G);
+      ctx.restore();
       const c = isoToWorld(p.gx + size / 2, p.gy + size / 2);
-      const icon = img(unlocked ? 'ic_build' : 'ic_key_silver');
-      const bob = unlocked ? Math.sin(this.time / 300) * 5 : 0;
-      if (icon) {
-        ctx.globalAlpha = unlocked ? 1 : 0.55;
-        ctx.drawImage(icon, c.x - 34, c.y - 52 + bob, 68, 68);
+      if (unlocked) {
+        const ens = img('ink/ink_enso_c');
+        const ic = img('ink/i_hammer');
+        const bob = Math.sin(this.time / 380) * 5;
+        if (ens) {
+          ctx.save();
+          ctx.translate(c.x, c.y - 18 + bob);
+          ctx.rotate(this.time / 4000);
+          ctx.drawImage(ens, -40, -40, 80, 80);
+          ctx.restore();
+        }
+        if (ic) ctx.drawImage(ic, c.x - 22, c.y - 40 + bob, 44, 44);
+      } else {
+        // sealed plots stay quiet: a faint lock, details on hover
+        const ic = img('ink/i_lock');
+        ctx.globalAlpha = highlighted ? 0.8 : 0.32;
+        if (ic) ctx.drawImage(ic, c.x - 14, c.y - 24, 28, 28);
         ctx.globalAlpha = 1;
-      }
-      if (!unlocked) {
-        ctx.font = '700 15px Cinzel, Georgia, serif';
-        ctx.textAlign = 'center';
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-        ctx.fillStyle = '#f3e6c4';
-        const t = `CH ${plotUnlockLevel(p.id)}`;
-        ctx.strokeText(t, c.x, c.y + 30);
-        ctx.fillText(t, c.x, c.y + 30);
+        if (highlighted) {
+          ctx.font = '700 13px Cinzel, Georgia, serif';
+          ctx.textAlign = 'center';
+          ctx.lineWidth = 4;
+          ctx.strokeStyle = 'rgba(10,10,12,0.75)';
+          ctx.fillStyle = '#f1ebdc';
+          const t = `CITY HALL ${plotUnlockLevel(p.id)}`;
+          ctx.strokeText(t, c.x, c.y + 18);
+          ctx.fillText(t, c.x, c.y + 18);
+        }
       }
       return;
     }
@@ -444,15 +475,28 @@ export class CityView {
     const im = img(def.sprite);
     if (!im) return;
     const r = this.plotRect(p);
-    if (highlighted) {
-      ctx.save();
-      ctx.shadowColor = 'rgba(255,225,120,0.95)';
-      ctx.shadowBlur = 28;
-      ctx.drawImage(im, r.x, r.y, r.w, r.h);
-      ctx.restore();
-    } else {
-      ctx.drawImage(im, r.x, r.y, r.w, r.h);
+    // squash & stretch after a level-up
+    let sx = 1;
+    let sy = 1;
+    const bt = this.bounces[p.id];
+    if (bt !== undefined) {
+      const k = (this.time - bt) / 700;
+      if (k >= 1) delete this.bounces[p.id];
+      else {
+        const damp = 1 - k;
+        sy = 1 + Math.sin(k * Math.PI * 3) * 0.08 * damp;
+        sx = 1 - Math.sin(k * Math.PI * 3) * 0.05 * damp;
+      }
     }
+    ctx.save();
+    ctx.translate(r.cx, r.bottom);
+    ctx.scale(sx, sy);
+    if (highlighted) {
+      ctx.shadowColor = 'rgba(246,225,160,0.95)';
+      ctx.shadowBlur = 26;
+    }
+    ctx.drawImage(im, -r.w / 2, -r.h, r.w, r.h);
+    ctx.restore();
     if (upgrading) {
       const sc = img('scaffold');
       if (sc) {
@@ -462,8 +506,6 @@ export class CityView {
         ctx.drawImage(sc, r.cx - w / 2, r.bottom - h - size * 6, w, h);
         ctx.globalAlpha = 1;
       }
-      // hammer sparks
-      if (Math.random() < 0.08) this.fx.burst(r.cx + (Math.random() - 0.5) * r.w * 0.4, r.y + r.h * 0.5, '#ffcf6a', 4, 0.5);
     }
   }
 
@@ -477,167 +519,135 @@ export class CityView {
     const r = this.plotRect(p);
 
     if (b.level > 0 || upgrading) {
-      // level badge
+      // level: a small vermilion seal
+      const seal = img('ink/seal_solid');
       const bx = r.cx - r.w * 0.3;
-      const by = r.bottom - r.h * 0.12;
-      ctx.save();
-      ctx.translate(bx, by);
-      ctx.scale(k * 0.9, k * 0.9);
-      ctx.beginPath();
-      ctx.moveTo(-15, -16);
-      ctx.lineTo(15, -16);
-      ctx.lineTo(15, 4);
-      ctx.lineTo(0, 16);
-      ctx.lineTo(-15, 4);
-      ctx.closePath();
-      const g = ctx.createLinearGradient(0, -16, 0, 16);
-      g.addColorStop(0, '#2f5ca8');
-      g.addColorStop(1, '#173469');
-      ctx.fillStyle = g;
-      ctx.fill();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = '#e8c766';
-      ctx.stroke();
-      ctx.fillStyle = '#fff';
-      ctx.font = '800 15px Cinzel, Georgia, serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(String(b.level), 0, -3);
-      ctx.restore();
+      const by = r.bottom - r.h * 0.13;
+      if (seal) {
+        ctx.save();
+        ctx.translate(bx, by);
+        ctx.scale(k * 0.9, k * 0.9);
+        ctx.rotate(-0.06);
+        ctx.drawImage(seal, -15, -15, 30, 30);
+        ctx.fillStyle = '#fbeee0';
+        ctx.font = '800 14px Cinzel, Georgia, serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(b.level), 0, 1);
+        ctx.restore();
+      }
     }
 
-    if (this.hoverPlot === p.id || this.selectedPlot === p.id || z > 1.05) {
+    if (this.hoverPlot === p.id || z > 1.05) {
       const unlocked = cityHallLevel(s) >= plotUnlockLevel(p.id);
-      const label = b.level > 0 ? def.name : unlocked ? `Build ${def.name}` : `${def.name} · City Hall ${plotUnlockLevel(p.id)}`;
-      this.label(ctx, r.cx, b.level > 0 ? r.bottom + 6 * k : r.bottom - r.h * 0.1, label, k);
+      const label = b.level > 0 ? def.name : unlocked ? `Build ${def.name}` : def.name;
+      inkLabel(ctx, r.cx, b.level > 0 ? r.bottom + 6 * k : r.bottom - r.h * 0.05, label, k);
     }
 
     if (upgrading) {
-      const total = upgrading.end - upgrading.start;
-      const prog = Math.min(1, (s.time - upgrading.start) / Math.max(1, total));
-      const secs = Math.max(0, (upgrading.end - s.time) / 1000);
-      this.progressBar(ctx, r.cx, r.y + r.h * 0.12, prog, secs, k, '#5fbf4a');
+      const prog = Math.min(1, (s.time - upgrading.start) / Math.max(1, upgrading.end - upgrading.start));
+      inkTimer(ctx, r.cx, r.y + r.h * 0.1, prog, (upgrading.end - s.time) / 1000, k, '#9fd08f');
+      // a hammer that keeps striking
+      const ham = img('ink/i_hammer');
+      if (ham) {
+        const swing = Math.sin(this.time / 140);
+        ctx.save();
+        ctx.translate(r.cx + 92 * k, r.y + r.h * 0.1 + 6 * k);
+        ctx.rotate(-0.5 + swing * 0.45);
+        ctx.drawImage(ham, -14 * k, -26 * k, 28 * k, 28 * k);
+        ctx.restore();
+      }
     }
 
     const bubble = this.bubblePos(p);
     if (bubble) {
-      const bob = Math.sin(this.time / 260 + p.gx) * 6;
+      const bob = Math.sin(this.time / 300 + p.gx) * 6;
       ctx.save();
       ctx.translate(bubble.x, bubble.y + bob);
       ctx.scale(k, k);
       ctx.fillStyle = 'rgba(0,0,0,0.25)';
       ctx.beginPath();
-      ctx.ellipse(0, 34, 18, 6, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 40 - bob, 16, 5, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.beginPath();
-      ctx.arc(0, 0, 27, 0, Math.PI * 2);
-      const g = ctx.createRadialGradient(-8, -10, 4, 0, 0, 28);
-      g.addColorStop(0, '#ffffff');
-      g.addColorStop(1, bubble.kind === 'res' ? '#f5e6b8' : '#d9e4f5');
+      const g = ctx.createRadialGradient(-8, -10, 4, 0, 0, 30);
+      g.addColorStop(0, 'rgba(48,42,34,0.97)');
+      g.addColorStop(1, 'rgba(10,10,12,0.97)');
       ctx.fillStyle = g;
-      ctx.fill();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = bubble.kind === 'res' ? '#c99a2e' : '#5a7fb8';
-      ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(-7, 24);
-      ctx.lineTo(7, 24);
-      ctx.lineTo(0, 34);
-      ctx.closePath();
+      ctx.arc(0, 0, 25, 0, Math.PI * 2);
       ctx.fill();
-      const iconName = bubble.kind === 'res' ? `ic_${def.producer}` : `unit_${def.trains}`;
-      const icon = img(iconName);
+      const ens = img(bubble.kind === 'res' ? 'ink/ink_enso_gold' : 'ink/ink_enso_c');
+      if (ens) {
+        ctx.save();
+        ctx.rotate(this.time / 2400 + p.gx);
+        ctx.drawImage(ens, -34, -34, 68, 68);
+        ctx.restore();
+      }
+      const icon = img(bubble.kind === 'res' ? `ic_${def.producer}` : `unit_${def.trains}`);
       if (icon) {
-        if (bubble.kind === 'idle') ctx.globalAlpha = 0.85;
-        ctx.drawImage(icon, -21, -21, 42, 42);
+        ctx.globalAlpha = bubble.kind === 'idle' ? 0.8 : 1;
+        ctx.drawImage(icon, -19, -19, 38, 38);
         ctx.globalAlpha = 1;
       }
       ctx.restore();
     }
 
     const train = def.trains ? trainingJob(s, def.trains) : undefined;
-    if (train && !upgrading) {
-      const total = train.end - train.start;
-      const prog = Math.min(1, (s.time - train.start) / Math.max(1, total));
-      this.progressBar(ctx, r.cx, r.y + r.h * 0.12, prog, (train.end - s.time) / 1000, k, '#4a8fd9');
-    }
+    if (train && !upgrading) inkTimer(ctx, r.cx, r.y + r.h * 0.1, (s.time - train.start) / Math.max(1, train.end - train.start), (train.end - s.time) / 1000, k, '#9cc0ea');
     if (p.type === 'academy') {
       const job = s.jobs.find((j) => j.kind === 'research');
-      if (job && !upgrading) this.progressBar(ctx, r.cx, r.y + r.h * 0.12, (s.time - job.start) / (job.end - job.start), (job.end - s.time) / 1000, k, '#9b6be0');
+      if (job && !upgrading) inkTimer(ctx, r.cx, r.y + r.h * 0.1, (s.time - job.start) / (job.end - job.start), (job.end - s.time) / 1000, k, '#e89a8c');
     }
     if (p.type === 'hospital') {
       const job = s.jobs.find((j) => j.kind === 'heal');
-      if (job && !upgrading) this.progressBar(ctx, r.cx, r.y + r.h * 0.12, (s.time - job.start) / (job.end - job.start), (job.end - s.time) / 1000, k, '#e05a6b');
+      if (job && !upgrading) inkTimer(ctx, r.cx, r.y + r.h * 0.1, (s.time - job.start) / (job.end - job.start), (job.end - s.time) / 1000, k, '#e89a8c');
     }
   }
 
-  private label(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, k: number): void {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(k, k);
-    ctx.font = '700 15px Cinzel, Georgia, serif';
-    const w = ctx.measureText(text).width + 24;
-    ctx.fillStyle = 'rgba(20,24,40,0.82)';
-    ctx.beginPath();
-    ctx.roundRect(-w / 2, -2, w, 26, 13);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(232,199,102,0.8)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.fillStyle = '#fbefc8';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, 0, 11);
-    ctx.restore();
-  }
-
-  private progressBar(ctx: CanvasRenderingContext2D, x: number, y: number, prog: number, secs: number, k: number, color: string): void {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(k, k);
-    const w = 150;
-    ctx.fillStyle = 'rgba(15,18,30,0.85)';
-    ctx.beginPath();
-    ctx.roundRect(-w / 2 - 3, -3, w + 6, 24, 12);
-    ctx.fill();
-    ctx.strokeStyle = '#e8c766';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    const g = ctx.createLinearGradient(0, 0, 0, 18);
-    g.addColorStop(0, color);
-    g.addColorStop(1, 'rgba(0,0,0,0.35)');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.roundRect(-w / 2, 0, Math.max(12, w * Math.max(0, Math.min(1, prog))), 18, 9);
-    ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.font = '700 13px Inter, system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const sec = Math.max(0, Math.ceil(secs));
-    const h = Math.floor(sec / 3600);
-    const m = Math.floor((sec % 3600) / 60);
-    const ss = sec % 60;
-    ctx.fillText(h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}` : `${m}:${String(ss).padStart(2, '0')}`, 0, 10);
-    ctx.restore();
-  }
-
-  private drawClouds(ctx: CanvasRenderingContext2D, dt: number): void {
-    for (const c of this.clouds) {
-      c.x += dt * 0.012;
-      if (c.x > 2600) c.x = -2600;
-      // ground shadow
-      ctx.fillStyle = 'rgba(20,40,10,0.08)';
-      ctx.beginPath();
-      ctx.ellipse(c.x + 120, c.y + 340, 260 * c.s, 110 * c.s, 0, 0, Math.PI * 2);
-      ctx.fill();
-      const g = ctx.createRadialGradient(c.x, c.y, 10, c.x, c.y, 260 * c.s);
-      g.addColorStop(0, 'rgba(255,255,255,0.22)');
-      g.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.ellipse(c.x, c.y, 300 * c.s, 140 * c.s, 0, 0, Math.PI * 2);
-      ctx.fill();
+  /** Ink-wash mist and a passing flock of swallows, drawn above everything with soft shadows. */
+  private drawSky(ctx: CanvasRenderingContext2D, dt: number): void {
+    const mist = img('ink/ink_mist');
+    if (mist) {
+      for (const m of this.mists) {
+        m.x += dt * m.v;
+        if (m.x > 2800) m.x = -2800;
+        const w = 900 * m.s;
+        const h = (w * mist.naturalHeight) / mist.naturalWidth;
+        // shadow on the ground
+        ctx.save();
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.globalAlpha = 0.16;
+        ctx.drawImage(mist, m.x - w / 2 + 160, m.y + 420, w, h);
+        ctx.restore();
+        ctx.globalAlpha = 0.2;
+        ctx.drawImage(mist, m.x - w / 2, m.y, w, h);
+        ctx.globalAlpha = 1;
+      }
+    }
+    const birds = img('ink/birds');
+    const B = this.birds;
+    B.next -= dt;
+    if (B.next <= 0 && B.t === 0) B.t = 1;
+    if (B.t > 0 && birds) {
+      B.x += dt * 0.32;
+      B.y -= dt * 0.05;
+      const flap = 1 + Math.sin(this.time / 90) * 0.06;
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      ctx.filter = 'blur(3px) brightness(0)';
+      ctx.drawImage(birds, B.x + 140, B.y + 380, 150, 150);
+      ctx.filter = 'none';
+      ctx.globalAlpha = 1;
+      ctx.translate(B.x + 75, B.y + 75);
+      ctx.scale(flap, 1 / flap);
+      ctx.drawImage(birds, -75, -75, 150, 150);
+      ctx.restore();
+      if (B.x > 2600) {
+        B.t = 0;
+        B.x = -2600;
+        B.y = 200 + Math.random() * 900;
+        B.next = 14000 + Math.random() * 12000;
+      }
     }
   }
 }

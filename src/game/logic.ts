@@ -67,6 +67,9 @@ export interface GameEvent {
   good?: boolean;
   plotId?: string;
   reportId?: string;
+  /** world tile where it happened (battles) */
+  x?: number;
+  y?: number;
 }
 
 export type Result = { ok: true } | { ok: false; reason: string };
@@ -867,7 +870,7 @@ function resolveArrival(s: GameState, m: March, rng: Rng, events: GameEvent[]): 
   body.rewards = reward;
   const title = `${win ? 'Victory' : res.winner === 'draw' ? 'Stalemate' : 'Defeat'} vs ${objLabel(t)}`;
   const rep = addReport(s, { kind: 'battle', title, win, body });
-  events.push({ kind: 'battle', text: title, good: win, reportId: rep.id });
+  events.push({ kind: 'battle', text: title, good: win, reportId: rep.id, x: t.x, y: t.y });
   startReturn(s, m, t.x, t.y, at);
 }
 

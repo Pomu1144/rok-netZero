@@ -45,8 +45,11 @@ export interface ModalHandle {
 
 interface ModalOpts {
   title: string;
+  /** kanji pressed into the header seal */
+  seal: string;
+  /** small Cinzel caption above the title */
+  kicker: string;
   size?: 'narrow' | 'wide' | '';
-  dark?: boolean;
   /** live modals are re-rendered whenever game state changes */
   live?: boolean;
   render: (body: HTMLElement, h: ModalHandle) => void;
@@ -59,15 +62,20 @@ export function openModal(opts: ModalOpts): ModalHandle {
   sfx.open();
   const root = el(`
     <div class="modal-back">
-      <div class="modal ${opts.size ?? ''}">
-        <div class="modal-head"><h2></h2><button class="modal-close" aria-label="Close">✕</button></div>
-        <div class="modal-body ${opts.dark ? 'dark' : ''}"></div>
+      <div class="modal ${opts.size ?? ''}" role="dialog" aria-modal="true">
+        <div class="modal-head">
+          <div class="seal">${esc(opts.seal)}</div>
+          <div class="grow"><div class="kicker">${esc(opts.kicker)}</div><h2></h2></div>
+          <button class="modal-close" aria-label="Close"></button>
+          <div class="brush"></div>
+        </div>
+        <div class="modal-body"></div>
       </div>
     </div>`);
   const body = $('.modal-body', root);
-  if (!opts.dark) body.style.backgroundImage = `url(${assetUrl('parchment')})`;
   const title = $('.modal-head h2', root);
   title.textContent = opts.title;
+  let closed = false;
   const handle: ModalHandle = {
     body,
     refresh: () => {
@@ -78,9 +86,12 @@ export function openModal(opts: ModalOpts): ModalHandle {
       updateTimers();
     },
     close: () => {
+      if (closed) return;
+      closed = true;
       const i = open.findIndex((m) => m.handle === handle);
       if (i >= 0) open.splice(i, 1);
-      root.remove();
+      root.classList.add('closing');
+      setTimeout(() => root.remove(), 200);
       sfx.close();
       opts.onClose?.();
     },
@@ -113,21 +124,23 @@ window.addEventListener('keydown', (e) => {
 });
 
 // ---------------------------------------------------------------------------
-// toasts
+// toasts: a brush band sweeping in
 
-export function toast(text: string, kind: 'good' | 'bad' | 'info' = 'info', icon?: string, onClick?: () => void): void {
-  const t = el(`<div class="toast ${kind}">${icon ? `<img src="${assetUrl(icon)}" width="26" height="26">` : ''}<span>${esc(text)}</span></div>`);
+export function toast(text: string, kind: 'good' | 'bad' | 'info' = 'info', iconName?: string, onClick?: () => void): void {
+  const mark = kind === 'bad' ? '<span class="mark">警</span>' : kind === 'good' ? '<span class="mark"></span>' : '';
+  const t = el(`<div class="toast ${kind}">${mark}${iconName ? `<img src="${assetUrl(iconName)}" alt="">` : ''}<span>${esc(text)}</span></div>`);
   if (onClick) t.addEventListener('click', onClick);
   const root = $('#toasts');
   root.appendChild(t);
-  while (root.children.length > 4) root.firstElementChild!.remove();
-  setTimeout(() => t.classList.add('out'), 3200);
-  setTimeout(() => t.remove(), 3700);
+  while (root.children.length > 3) root.firstElementChild!.remove();
+  setTimeout(() => t.classList.add('out'), 3400);
+  setTimeout(() => t.remove(), 3900);
 }
 
 // ---------------------------------------------------------------------------
 // shared widgets
 
+/** A painted (full colour) game icon such as a resource or item. */
 export function icon(name: string, size = 22): string {
   return `<img src="${assetUrl(name)}" width="${size}" height="${size}" alt="" style="object-fit:contain">`;
 }
@@ -138,7 +151,7 @@ export function costHtml(s: GameState, cost: Cost, mult = 1): string {
     const lack = s.res[k] < need;
     return `<span class="cost ${lack ? 'lack' : ''}" title="${k}">${icon(`ic_${k}`)}${fmt(need)}${lack ? ` <small>/ ${fmt(s.res[k])}</small>` : ''}</span>`;
   });
-  return `<div class="costs">${parts.join('') || '<span class="muted">Free</span>'}</div>`;
+  return `<div class="costs">${parts.join('') || '<span class="muted">No cost</span>'}</div>`;
 }
 
 export function rewardHtml(r: Reward): string {
@@ -152,22 +165,14 @@ export function rewardHtml(r: Reward): string {
   if (r.items) {
     for (const k in r.items) {
       const v = r.items[k as ItemId] ?? 0;
-      if (v > 0) out.push(`<span class="reward" title="${ITEMS[k as ItemId].name}">${icon(ITEMS[k as ItemId].icon)}${ITEMS[k as ItemId].name} ×${v}</span>`);
+      if (v > 0) out.push(`<span class="reward" title="${ITEMS[k as ItemId].name}">${icon(ITEMS[k as ItemId].icon)}×${v}</span>`);
     }
   }
   if (r.sculptures) {
-    for (const k in r.sculptures) {
-      out.push(`<span class="reward">${icon('ic_sculpture')}${COMMANDER_BY_ID[k].name} ×${r.sculptures[k]}</span>`);
-    }
+    for (const k in r.sculptures) out.push(`<span class="reward">${icon('ic_sculpture')}${COMMANDER_BY_ID[k].name} ×${r.sculptures[k]}</span>`);
   }
   if (r.xp) out.push(`<span class="reward">${icon('ic_tome')}${fmt(r.xp)} XP</span>`);
   return `<div class="rewards">${out.join('')}</div>`;
-}
-
-export function stars(n: number, max = 6): string {
-  let s = '';
-  for (let i = 0; i < max; i++) s += i < n ? '★' : '<span class="off">★</span>';
-  return `<span class="stars">${s}</span>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -196,4 +201,36 @@ export function updateTimers(): void {
       e.textContent = d > 0 ? `${d}d ${pad(h)}:${pad(m)}:${pad(s)}` : h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
     }
   });
+}
+
+/** Animate resource icons flying from a screen point into a HUD element. */
+export function flyTo(iconName: string, fromX: number, fromY: number, target: Element | null, count = 6, onArrive?: () => void): void {
+  if (!target) return;
+  const r = target.getBoundingClientRect();
+  const tx = r.left + 18;
+  const ty = r.top + r.height / 2;
+  let arrived = 0;
+  for (let i = 0; i < count; i++) {
+    const f = document.createElement('img');
+    f.className = 'flyer';
+    f.src = assetUrl(iconName);
+    document.body.appendChild(f);
+    const sx = fromX + (Math.random() - 0.5) * 70;
+    const sy = fromY + (Math.random() - 0.5) * 40;
+    const mx = (sx + tx) / 2 + (Math.random() - 0.5) * 160;
+    const my = Math.min(sy, ty) - 80 - Math.random() * 80;
+    const a = f.animate(
+      [
+        { transform: `translate(${fromX - 17}px, ${fromY - 17}px) scale(0.4)`, opacity: 0 },
+        { transform: `translate(${sx - 17}px, ${sy - 17}px) scale(1.15)`, opacity: 1, offset: 0.18 },
+        { transform: `translate(${mx - 17}px, ${my - 17}px) scale(1)`, opacity: 1, offset: 0.55 },
+        { transform: `translate(${tx - 17}px, ${ty - 17}px) scale(0.55)`, opacity: 0.9 },
+      ],
+      { duration: 850 + i * 70, easing: 'cubic-bezier(0.45, 0, 0.3, 1)', delay: i * 45, fill: 'both' },
+    );
+    a.onfinish = () => {
+      f.remove();
+      if (++arrived === count) onArrive?.();
+    };
+  }
 }

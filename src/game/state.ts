@@ -4,6 +4,7 @@ import type { ItemId } from '../data/items';
 import { PLOTS } from '../data/layout';
 import type { ResKey, TroopType } from '../data/types';
 import { generateWorld } from './world';
+import type { AllianceState } from './alliance';
 
 export type Troops = Record<string, number>;
 
@@ -27,6 +28,11 @@ export interface Job {
   amount: number;
   troops?: Troops;
   helped?: boolean;
+  /** alliance helps still to arrive, and when the next lands */
+  helpsLeft?: number;
+  helpAt?: number;
+  /** time each help removes, fixed when help is requested */
+  helpCut?: number;
 }
 
 export interface CommanderState {
@@ -154,6 +160,8 @@ export interface GameState {
     holyCaptured: number;
     raidsDefended: number;
     chestsOpened: number;
+    /** alliance requests answered (optional for older saves) */
+    allyHelps?: number;
   };
   tavern: { silverFreeAt: number; goldFreeAt: number };
   raid: Raid | null;
@@ -171,6 +179,8 @@ export interface GameState {
   login?: { claimed: number; last: string; cycles: number };
   /** honours: tiers claimed per achievement id (see achievements.ts) */
   achievements?: Record<string, number>;
+  /** membership of the AI alliance (see alliance.ts) */
+  alliance?: AllianceState;
   /** today's task baseline and opened activity chests */
   daily?: { day: string; base: Record<'collections' | 'troopsTrained' | 'barbsKilled' | 'gathered' | 'researchDone' | 'chestsOpened' | 'buildLevels', number>; chests: number[] };
 }

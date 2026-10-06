@@ -8,7 +8,7 @@ export interface QuestDef {
   check: (s: GameState) => [number, number];
   reward: Reward;
   /** which panel helps complete it */
-  hint?: { plot?: string; view?: 'world' | 'commanders' | 'research' | 'tavern' };
+  hint?: { plot?: string; view?: 'world' | 'commanders' | 'research' | 'tavern' | 'alliance' };
 }
 
 const lvl = (type: Parameters<typeof buildingLevel>[1], n: number) => (s: GameState): [number, number] => [buildingLevel(s, type), n];
@@ -17,6 +17,7 @@ export const QUESTS: QuestDef[] = [
   { id: 'q_collect', title: 'Harvest your Farm', check: (s) => [s.stats.collections, 1], reward: { res: { food: 2000, wood: 2000 } }, hint: { plot: 'farm_1' } },
   { id: 'q_ch2', title: 'Upgrade City Hall to Lv.2', check: (s) => [cityHallLevel(s), 2], reward: { res: { food: 3000, wood: 3000 }, items: { speed_5m: 2 } }, hint: { plot: 'city_hall' } },
   { id: 'q_barb1', title: 'Defeat a barbarian on the world map', check: (s) => [s.stats.barbsKilled, 1], reward: { res: { food: 4000, wood: 4000 }, items: { tome_500: 2 } }, hint: { view: 'world' } },
+  { id: 'q_alliance', title: 'Join an alliance', check: (s) => [s.alliance ? 1 : 0, 1], reward: { res: { gems: 100 }, items: { speed_15m: 2 } }, hint: { view: 'alliance' } },
   { id: 'q_archery', title: 'Build an Archery Range', check: lvl('archery_range', 1), reward: { res: { food: 3000, wood: 3000 } }, hint: { plot: 'archery_range' } },
   { id: 'q_train100', title: 'Train 100 troops', check: (s) => [s.stats.troopsTrained, 100], reward: { res: { food: 5000, wood: 5000 }, items: { speed_15m: 1 } }, hint: { plot: 'barracks' } },
   { id: 'q_wall2', title: 'Upgrade City Wall to Lv.2', check: lvl('wall', 2), reward: { res: { food: 5000, wood: 5000 } }, hint: { plot: 'wall' } },

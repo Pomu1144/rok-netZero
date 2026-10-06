@@ -48,6 +48,8 @@ import { costHtml, icon, onAct, openModal, toast } from '../dom';
 import { esc, fmt, fmtFull, fmtTime } from '../format';
 import { BUILDING_KANJI, ink, pips, req } from '../ink';
 import { openTavern } from './army';
+import { openAlliance } from './alliance';
+import { MAX_HELPS, askHelp, canAskHelp } from '../../game/alliance';
 
 export function jobBar(job: Job, color = ''): string {
   return `<div class="row" style="gap:12px">
@@ -498,6 +500,13 @@ export function openSpeedup(ctx: UiCtx, jobId: string): void {
         <div style="font-weight:700;font-size:16px;margin:2px 0 10px">${esc(jobTitle(ctx, job))}</div>
         ${jobBar(job, 'green')}
         ${free ? `<div class="action-row" style="justify-content:stretch"><button class="btn btn-gold btn-xl" style="flex:1" data-act="free">${ink('i_hammer', 20)} Finish now · free</button></div>` : ''}
+        ${
+          canAskHelp(s, job)
+            ? `<div class="row card al-ask"><img src="${assetUrl('al_help')}" width="44" height="44" alt=""><div class="grow"><b>Ask the alliance</b><div class="muted">Up to ${MAX_HELPS} helps, each cutting at least a minute</div></div><button class="btn btn-sm btn-gold" data-act="help">Ask</button></div>`
+            : !s.alliance && job.kind !== 'train'
+              ? `<div class="row card al-ask"><img src="${assetUrl('al_help')}" width="44" height="44" alt=""><div class="grow"><b>Join an alliance</b><div class="muted">Allies cut time from every build and research</div></div><button class="btn btn-sm" data-act="alliance">Join</button></div>`
+              : ''
+        }
         <h3 class="sec">Speedups</h3>
         ${
           items.length
@@ -518,6 +527,13 @@ export function openSpeedup(ctx: UiCtx, jobId: string): void {
           h.close();
         },
         use: (t) => ctx.run((st) => useSpeedupItem(st, jobId, t.dataset.item as ItemId), sfx.coin),
+        help: () => {
+          if (ctx.run((st) => (askHelp(st, jobId) ? { ok: true } : { ok: false, reason: 'Already requested' }), sfx.horn)) toast('Your allies answer the call', 'good', 'al_help');
+        },
+        alliance: () => {
+          h.close();
+          openAlliance(ctx);
+        },
         gems: () => {
           if (ctx.run((st) => finishWithGems(st, jobId), sfx.coin)) h.close();
         },

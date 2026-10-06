@@ -6,9 +6,10 @@ import { troopIdSprite } from '../data/troops';
 import { RES_KEYS } from '../data/types';
 import { FREE_FINISH_SECONDS, canAfford, cityHallLevel, findObj, objLabel, totalPower, upgradeInfo } from '../game/logic';
 import { achievementBadge } from '../game/achievements';
+import { allianceBadge, canAskHelp } from '../game/alliance';
 import { dailyBadge, dayKey, loginClaimable } from '../game/daily';
 import { activeQuests, questDone } from '../game/quests';
-import { MAX_AP } from '../game/state';
+import { MAX_AP, type Job } from '../game/state';
 import type { UiCtx } from './ctx';
 import { $, el } from './dom';
 import { esc, fmt } from './format';
@@ -19,6 +20,7 @@ export interface HudHandlers {
   toggleView: () => void;
   openNav: (id: string) => void;
   openJob: (jobId: string) => void;
+  askHelp: (jobId: string) => void;
   openMarchInfo: (marchId: string) => void;
   idleBuilder: () => void;
   questClick: () => void;
@@ -32,6 +34,7 @@ const NAV: [string, InkIcon, string][] = [
   ['research', 'i_research', 'Academy'],
   ['bag', 'i_bag', 'Satchel'],
   ['quests', 'i_scroll', 'Decrees'],
+  ['alliance', 'i_banner', 'Alliance'],
   ['mail', 'i_mail', 'Reports'],
 ];
 
@@ -92,6 +95,8 @@ export class Hud {
       const t = e.target as HTMLElement;
       const nav = t.closest('[data-nav]') as HTMLElement | null;
       if (nav) return this.h.openNav(nav.dataset.nav!);
+      const help = t.closest('[data-help]') as HTMLElement | null;
+      if (help) return this.h.askHelp(help.dataset.help!);
       const job = t.closest('[data-job]') as HTMLElement | null;
       if (job) return this.h.openJob(job.dataset.job!);
       const march = t.closest('[data-march]') as HTMLElement | null;
@@ -110,6 +115,11 @@ export class Hud {
     if (this.cache.get(part) === html) return;
     this.cache.set(part, html);
     this.parts[part].innerHTML = html;
+  }
+
+  /** One-tap alliance help on a queue row (shown only while help can be asked). */
+  private helpBtn(j: Job): string {
+    return canAskHelp(this.ctx.game.state, j) ? `<button class="q-help" data-help="${j.id}" aria-label="Ask alliance for help"><img src="${assetUrl('al_help')}" alt=""></button>` : '';
   }
 
   /** The HUD element a resource icon should fly into. */
@@ -151,14 +161,14 @@ export class Hud {
     const builds = s.jobs.filter((j) => j.kind === 'build');
     for (const j of builds) {
       const free = (j.end - s.time) / 1000 <= FREE_FINISH_SECONDS;
-      q.push(`<div class="queue ${free ? 'free' : ''}" data-job="${j.id}">${ink('i_hammer', 26)}<div class="q-main"><div class="q-title">${esc(jobTitle(this.ctx, j))}</div><div class="q-bar"><div data-start="${j.start}" data-end="${j.end}"></div></div></div>${free ? '<span class="free-tag">FREE</span>' : `<span class="q-time" data-end="${j.end}"></span>`}</div>`);
+      q.push(`<div class="queue ${free ? 'free' : ''}" data-job="${j.id}">${ink('i_hammer', 26)}<div class="q-main"><div class="q-title">${esc(jobTitle(this.ctx, j))}</div><div class="q-bar"><div data-start="${j.start}" data-end="${j.end}"></div></div></div>${free ? '<span class="free-tag">FREE</span>' : `${this.helpBtn(j)}<span class="q-time" data-end="${j.end}"></span>`}</div>`);
     }
     for (let i = builds.length; i < s.builders; i++) {
       q.push(`<div class="queue idle" data-idle="1">${ink('i_hammer', 26)}<div class="q-main"><div class="q-title">Builder at rest</div><div class="q-sub">Tap to find work</div></div></div>`);
     }
     for (const j of s.jobs.filter((x) => x.kind !== 'build')) {
       const ic = j.kind === 'research' ? ink(TECH_BY_ID[j.target].icon, 26) : j.kind === 'heal' ? ink('i_heal', 26) : `<img src="${assetUrl(troopIdSprite(j.target))}" alt="">`;
-      q.push(`<div class="queue" data-job="${j.id}">${ic}<div class="q-main"><div class="q-title">${esc(jobTitle(this.ctx, j))}</div><div class="q-bar"><div data-start="${j.start}" data-end="${j.end}"></div></div></div><span class="q-time" data-end="${j.end}"></span></div>`);
+      q.push(`<div class="queue" data-job="${j.id}">${ic}<div class="q-main"><div class="q-title">${esc(jobTitle(this.ctx, j))}</div><div class="q-bar"><div data-start="${j.start}" data-end="${j.end}"></div></div></div>${this.helpBtn(j)}<span class="q-time" data-end="${j.end}"></span></div>`);
     }
     if (s.marches.length) q.push('<div class="kicker" style="margin-top:6px">Marches</div>');
     for (const m of s.marches) {
@@ -218,6 +228,7 @@ export class Hud {
     badge('calendar', loginClaimable(s, dayKey()) >= 0 ? 1 : 0);
     badge('daily', dailyBadge(s));
     badge('honours', achievementBadge(s));
+    badge('alliance', s.alliance ? allianceBadge(s) : 0);
     badge('commanders', Object.values(s.commanders).some((c) => !c.unlocked && c.sculptures >= 10) ? 1 : 0);
 
     this.root.querySelectorAll('.rail-btn[data-nav=city], .rail-btn[data-nav=world]').forEach((b) => {

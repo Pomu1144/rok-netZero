@@ -14,6 +14,7 @@ import { closeAllModals, icon, onAct, openModal, rewardHtml, toast } from '../do
 import { esc, fmt, fmtFull } from '../format';
 import { ink } from '../ink';
 import { openCommanders, openTavern } from './army';
+import { openAlliance } from './alliance';
 import { canPlayBattle, playBattle } from '../battleScene';
 import { openResearch } from './city';
 
@@ -124,6 +125,7 @@ export function questGo(ctx: UiCtx, hint: NonNullable<(typeof QUESTS)[number]['h
   else if (hint.view === 'commanders') openCommanders(ctx);
   else if (hint.view === 'research') openResearch(ctx);
   else if (hint.view === 'tavern') openTavern(ctx);
+  else if (hint.view === 'alliance') openAlliance(ctx);
 }
 
 // ---------------------------------------------------------------------------

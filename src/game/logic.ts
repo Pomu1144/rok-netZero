@@ -41,6 +41,7 @@ import {
 } from '../data/troops';
 import { RES_KEYS, addBonuses, type BonusKey, type Bonuses, type Cost, type ResKey, type TroopType } from '../data/types';
 import { talentBonuses } from './talents';
+import { allianceCheer, allianceTick } from './alliance';
 import { simulateBattle, troopPower, type BattleResult } from './battle';
 import { Rng } from './rng';
 import {
@@ -1007,6 +1008,7 @@ export function tick(s: GameState, dtGameMs: number, rng: Rng): GameEvent[] {
   const events: GameEvent[] = [];
   s.time += dtGameMs;
   s.ap = Math.min(MAX_AP, s.ap + (dtGameMs / 1000) * AP_PER_SECOND);
+  allianceTick(s, rng, events);
 
   // jobs
   const done = s.jobs.filter((j) => j.end <= s.time).sort((a, b) => a.end - b.end);
@@ -1017,6 +1019,7 @@ export function tick(s: GameState, dtGameMs: number, rng: Rng): GameEvent[] {
       b.level = j.amount;
       b.collectedAt = s.time;
       events.push({ kind: 'build', text: `${BUILDINGS[b.type].name} upgraded to Lv.${b.level}`, good: true, plotId: j.target });
+      if (b.type === 'city_hall') allianceCheer(s, `Congratulations on City Hall Lv.${b.level}, my lord!`, rng);
     } else if (j.kind === 'research') {
       s.research[j.target] = j.amount;
       s.stats.researchDone++;

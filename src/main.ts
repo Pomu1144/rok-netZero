@@ -38,6 +38,8 @@ import { openCommander, openCommanders, openMarch, openTavern } from './ui/panel
 import { openBuilding, openHospital, openResearch, openSpeedup, openTrain } from './ui/panels/city';
 import { openCalendar, openDaily } from './ui/panels/daily';
 import { openAway, openHonours } from './ui/panels/honours';
+import { openAlliance } from './ui/panels/alliance';
+import { askHelp } from './game/alliance';
 import { awaySnapshot, awaySummary, awayWorthShowing, type AwaySummary } from './game/away';
 import { dayKey, loginClaimable, rollDaily } from './game/daily';
 import { openAdvisor, openBag, openMail, openProfile, openQuests, openSettings, questGo } from './ui/panels/misc';
@@ -357,8 +359,16 @@ const hud = new Hud(ctx, {
     if (id === 'calendar') openCalendar(ctx);
     if (id === 'daily') openDaily(ctx);
     if (id === 'honours') openHonours(ctx);
+    if (id === 'alliance') openAlliance(ctx);
   },
   openJob: (jobId) => openSpeedup(ctx, jobId),
+  askHelp: (jobId) => {
+    if (ctx.game.act((s) => (askHelp(s, jobId) ? { ok: true } : { ok: false, reason: '' })).ok) {
+      sfx.horn();
+      haptic('tap');
+      toast('Your allies answer the call', 'good', 'al_help');
+    }
+  },
   openMarchInfo: (marchId) => {
     const m = game.state.marches.find((x) => x.id === marchId);
     if (!m) return;

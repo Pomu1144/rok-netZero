@@ -39,10 +39,10 @@ Legend: `[x]` done · `[ ]` to do · **(you)** needs the owner (accounts, signin
 ## Phase 4: polish and compliance
 
 - [x] Haptics on key actions
-- [ ] Accessibility: text scale, reduced motion, colour-blind safe markers
+- [x] Accessibility: text scale, reduced motion, colour-blind safe markers
 - [ ] Localisation: English, Spanish, Japanese, Simplified Chinese
 - [ ] Performance budget: 60 fps on iPhone 11, texture memory under 300 MB, cold start under 3 s
-- [ ] Crash safety: save versioning and migrations, error boundary with recovery
+- [x] Crash safety: save versioning and migrations, error boundary with recovery
 - [ ] Final store screenshots and preview video
 
 ## Owner tasks **(you)**

@@ -1,4 +1,5 @@
 import { img } from '../assets';
+import { colorSafe, routeColor } from '../a11y';
 import { drawKingdom, drawLegend, kingdomBlend } from './kingdomMap';
 import { troopIdSprite } from '../data/troops';
 import { COMMANDER_BY_ID } from '../data/commanders';
@@ -220,11 +221,12 @@ export class WorldView {
     for (const m of s.marches) {
       if (m.phase === 'gathering') continue;
       const p = marchPosition(s, m);
-      const color = m.phase === 'returning' ? 'rgba(241,235,220,0.75)' : m.kind === 'gather' ? 'rgba(143,181,138,0.95)' : m.kind === 'scout' ? 'rgba(232,207,140,0.95)' : 'rgba(217,96,79,0.95)';
+      const color = routeColor(m.phase === 'returning' ? 'return' : m.kind);
       ctx.strokeStyle = 'rgba(10,10,10,0.35)';
       ctx.lineWidth = 9 / Math.max(0.4, cam.zoom);
       ctx.lineCap = 'round';
-      ctx.setLineDash([1, 22 / Math.max(0.4, cam.zoom)]);
+      // in the colour-safe palette the route kinds also differ in pattern
+      ctx.setLineDash(colorSafe() && m.kind === 'gather' ? [14 / Math.max(0.4, cam.zoom), 10 / Math.max(0.4, cam.zoom)] : [1, 22 / Math.max(0.4, cam.zoom)]);
       ctx.lineDashOffset = -this.time / 40;
       ctx.beginPath();
       ctx.moveTo(p.x * T, p.y * T + 3);
@@ -415,7 +417,7 @@ export class WorldView {
       accent = 'rgba(217,96,79,0.95)';
       text = `Fort · ${o.level}`;
     } else if (o.kind === 'node') {
-      accent = o.occupiedBy ? 'rgba(232,207,140,0.95)' : 'rgba(143,181,138,0.9)';
+      accent = o.occupiedBy ? 'rgba(232,207,140,0.95)' : routeColor('gather');
       text = `${{ food: 'Cropland', wood: 'Timber', stone: 'Stone', gold: 'Gold' }[o.res!]} · ${o.level}`;
     } else if (o.kind === 'city') {
       accent = 'rgba(185,163,217,0.9)';
@@ -489,7 +491,7 @@ export class WorldView {
         ctx.drawImage(p, bx - 17, by - 19, 34, 45);
         ctx.restore();
       }
-      ctx.strokeStyle = gathering ? 'rgba(143,181,138,0.95)' : m.kind === 'attack' && m.phase !== 'returning' ? 'rgba(217,96,79,0.95)' : 'rgba(232,207,140,0.9)';
+      ctx.strokeStyle = gathering ? routeColor('gather') : m.kind === 'attack' && m.phase !== 'returning' ? routeColor('attack') : 'rgba(232,207,140,0.9)';
       ctx.lineWidth = 1.5;
       ctx.strokeRect(bx - 19.5, by - 21.5, 39, 45);
     }

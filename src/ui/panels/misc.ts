@@ -1,4 +1,5 @@
 import { assetUrl } from '../../assets';
+import { TEXT_SIZES, applyA11y, type MotionPref } from '../../a11y';
 import { setMuted, setMusic, sfx } from '../../audio';
 import { persistSave, setHaptics } from '../../native';
 import { SAVE_KEY } from '../../game/state';
@@ -266,6 +267,19 @@ export function openSettings(ctx: UiCtx): void {
           <button class="btn ${s.musicOff ? '' : 'btn-gold'}" data-act="music">Music ${s.musicOff ? 'off' : 'on'}</button>
           <button class="btn ${s.hapticsOff ? '' : 'btn-gold'}" data-act="haptics">Vibration ${s.hapticsOff ? 'off' : 'on'}</button>
         </div>
+        <h3 class="sec">Accessibility</h3>
+        <div class="muted">Text size</div>
+        <div class="row" style="flex-wrap:wrap;margin:6px 0 10px" role="group" aria-label="Text size">
+          ${TEXT_SIZES.map((v) => `<button class="btn btn-sm ${(s.a11y?.text ?? 1) === v ? 'btn-gold' : ''}" data-act="text" data-v="${v}" style="font-size:${Math.round(13 * v)}px" aria-pressed="${(s.a11y?.text ?? 1) === v}">${Math.round(v * 100)}%</button>`).join('')}
+        </div>
+        <div class="muted">Motion</div>
+        <div class="row" style="flex-wrap:wrap;margin:6px 0 10px" role="group" aria-label="Motion">
+          ${(['system', 'reduce', 'full'] as const).map((v) => `<button class="btn btn-sm ${(s.a11y?.motion ?? 'system') === v ? 'btn-gold' : ''}" data-act="motion" data-v="${v}" aria-pressed="${(s.a11y?.motion ?? 'system') === v}">${{ system: 'Follow device', reduce: 'Reduce', full: 'Full' }[v]}</button>`).join('')}
+        </div>
+        <div class="row" style="flex-wrap:wrap">
+          <button class="btn ${s.a11y?.colorSafe ? 'btn-gold' : ''}" data-act="colorsafe" aria-pressed="${!!s.a11y?.colorSafe}">Colour-safe markers ${s.a11y?.colorSafe ? 'on' : 'off'}</button>
+        </div>
+        <div class="muted" style="font-size:11.5px;margin-top:4px">Uses orange and blue instead of red and green, with distinct route patterns on the map.</div>
         <h3 class="sec">Chronicle backup</h3>
         <div class="muted">Copy your save to move it to another device, or paste one to restore it.</div>
         <div class="row" style="flex-wrap:wrap;margin-top:10px">
@@ -283,6 +297,18 @@ export function openSettings(ctx: UiCtx): void {
         <button class="btn btn-red" data-act="reset">Found a new kingdom</button>`;
       onAct(body, {
         speed: (t) => ctx.game.act((st) => void (st.speed = Number(t.dataset.v))),
+        text: (t) => {
+          ctx.game.act((st) => void (st.a11y = { ...st.a11y, text: Number(t.dataset.v) }));
+          applyA11y(ctx.game.state);
+        },
+        motion: (t) => {
+          ctx.game.act((st) => void (st.a11y = { ...st.a11y, motion: t.dataset.v as MotionPref }));
+          applyA11y(ctx.game.state);
+        },
+        colorsafe: () => {
+          ctx.game.act((st) => void (st.a11y = { ...st.a11y, colorSafe: !st.a11y?.colorSafe }));
+          applyA11y(ctx.game.state);
+        },
         mute: () => {
           ctx.game.act((st) => void (st.muted = !st.muted));
           setMuted(ctx.game.state.muted);

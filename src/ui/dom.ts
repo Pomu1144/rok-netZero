@@ -1,4 +1,5 @@
 import { assetUrl } from '../assets';
+import { reducedMotion } from '../a11y';
 import { sfx } from '../audio';
 import { COMMANDER_BY_ID } from '../data/commanders';
 import { ITEMS, type ItemId } from '../data/items';
@@ -210,6 +211,10 @@ export function updateTimers(): void {
 /** Animate resource icons flying from a screen point into a HUD element. */
 export function flyTo(iconName: string, fromX: number, fromY: number, target: Element | null, count = 6, onArrive?: () => void): void {
   if (!target) return;
+  if (reducedMotion()) {
+    onArrive?.();
+    return;
+  }
   const r = target.getBoundingClientRect();
   const tx = r.left + 18;
   const ty = r.top + r.height / 2;

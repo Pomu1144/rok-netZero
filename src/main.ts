@@ -41,15 +41,20 @@ import { openAway, openHonours } from './ui/panels/honours';
 import { openAlliance } from './ui/panels/alliance';
 import { openHunt } from './ui/panels/hunt';
 import { openCampaign } from './ui/panels/campaign';
+import { guarded, installCrashGuard } from './ui/crash';
+import { applyA11y, reducedMotion, watchSystemMotion } from './a11y';
 import { rollHunt, seasonEnd } from './game/hunt';
 import { askHelp } from './game/alliance';
 import { awaySnapshot, awaySummary, awayWorthShowing, type AwaySummary } from './game/away';
 import { dayKey, loginClaimable, rollDaily } from './game/daily';
 import { openAdvisor, openBag, openMail, openProfile, openQuests, openSettings, questGo } from './ui/panels/misc';
 
+installCrashGuard();
 registerServiceWorker();
 await initStorage();
 const game = new Game();
+applyA11y(game.state);
+watchSystemMotion(() => game.state);
 setMuted(game.state.muted);
 setMusic(!game.state.musicOff);
 setHaptics(!game.state.hapticsOff);
@@ -502,7 +507,7 @@ game.onChange(() => {
 
 let last = performance.now();
 let uiTimer = 0;
-function frame(now: number): void {
+const step = guarded((now: number) => {
   const dt = Math.min(100, now - last);
   last = now;
   game.update();
@@ -521,6 +526,11 @@ function frame(now: number): void {
     hud.update({ x: Math.floor(c.x / T), y: Math.floor(c.y / T) });
     updateTimers();
   }
+}, 'frame');
+
+/** The loop keeps running even if a frame throws (the crash guard reports it). */
+function frame(now: number): void {
+  step(now);
   requestAnimationFrame(frame);
 }
 
@@ -531,9 +541,11 @@ async function boot(): Promise<void> {
   const title = $('#title-screen');
   const video = $('.t-video', title) as HTMLVideoElement;
   video.addEventListener('playing', () => video.classList.add('on'), { once: true });
-  video.play().catch(() => {
-    /* autoplay may be blocked; the still frame stays */
-  });
+  // with reduced motion the painted still stands in for the animated title
+  if (!reducedMotion())
+    video.play().catch(() => {
+      /* autoplay may be blocked; the still frame stays */
+    });
   const fill = $('.t-load .fill', title);
   await loadAssets((p) => (fill.style.width = `${Math.round(p * 100)}%`));
   $('.t-load', title).classList.add('hidden');
@@ -554,6 +566,7 @@ async function boot(): Promise<void> {
         video.pause();
         title.remove();
       }, 1000);
+      if (game.recovered) setTimeout(() => toast('The chronicle was damaged · restored from the backup', 'info'), 1600);
       const awayMs = game.offlineMs;
       const before = awaySnapshot(game.state);
       const offline = game.catchUp();

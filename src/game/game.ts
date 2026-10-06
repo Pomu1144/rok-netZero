@@ -16,6 +16,8 @@ export class Game {
   lastReal = performance.now();
   private saveTimer = 0;
   offlineMs = 0;
+  /** the main save was damaged and the backup was loaded instead */
+  recovered = false;
   /** true when the last offline stretch hit the cap */
   offlineCapped = false;
 
@@ -23,6 +25,7 @@ export class Game {
     const loaded = loadGame();
     if (loaded) {
       this.state = loaded.state;
+      this.recovered = !!loaded.recovered;
       const away = Math.max(0, Date.now() - loaded.savedAt);
       this.offlineMs = Math.min(OFFLINE_CAP_MS, away);
       this.offlineCapped = away > OFFLINE_CAP_MS;

@@ -2,6 +2,7 @@ import { img } from '../assets';
 import { isHidden, marchPosition } from '../game/logic';
 import { PLAYER_POS, WORLD_SIZE, type GameState } from '../game/state';
 import type { Camera } from './camera';
+import { colorSafe, routeColor } from '../a11y';
 
 /**
  * The kingdom view: far zoomed out, the realm becomes a painted ink map with
@@ -151,7 +152,7 @@ export function drawKingdom(ctx: CanvasRenderingContext2D, cam: Camera, s: GameS
     const p = marchPosition(s, m);
     const from = sc(p.x, p.y);
     const to = sc(m.toX, m.toY);
-    ctx.strokeStyle = m.kind === 'gather' ? 'rgba(93,125,58,0.95)' : m.phase === 'returning' ? 'rgba(60,50,40,0.7)' : 'rgba(170,40,30,0.95)';
+    ctx.strokeStyle = m.phase === 'returning' ? 'rgba(60,50,40,0.7)' : colorSafe() ? routeColor(m.kind === 'gather' ? 'gather' : 'attack') : m.kind === 'gather' ? 'rgba(93,125,58,0.95)' : 'rgba(170,40,30,0.95)';
     ctx.lineWidth = 2;
     ctx.setLineDash([4, 4]);
     ctx.lineDashOffset = -time / 60;

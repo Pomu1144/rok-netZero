@@ -178,6 +178,8 @@ export interface GameState {
   /** guided first-session tutorial progress */
   ftueStep?: number;
   musicOff?: boolean;
+  /** accessibility: text scale, motion preference, colour-safe palette */
+  a11y?: { text?: number; motion?: 'system' | 'reduce' | 'full'; colorSafe?: boolean };
   /** seven-day login calendar (see daily.ts) */
   login?: { claimed: number; last: string; cycles: number };
   /** honours: tiers claimed per achievement id (see achievements.ts) */
@@ -192,7 +194,7 @@ export interface GameState {
   daily?: { day: string; base: Record<'collections' | 'troopsTrained' | 'barbsKilled' | 'gathered' | 'researchDone' | 'chestsOpened' | 'buildLevels', number>; chests: number[] };
 }
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 export const PLAYER_POS = { x: 60, y: 60 };
 export const WORLD_SIZE = 120;
 export const MAX_AP = 1000;
@@ -290,6 +292,9 @@ export function cloneTroops(t: Troops): Troops {
 }
 
 export const SAVE_KEY = 'realm-of-kings-save';
+/** The last good save from a few minutes earlier, kept for recovery. */
+export const BACKUP_KEY = `${SAVE_KEY}.bak`;
+const BACKUP_EVERY_MS = 5 * 60_000;
 
 /** Native builds mirror every save into durable device storage (see src/native.ts). */
 let saveMirror: ((raw: string) => void) | null = null;
@@ -297,9 +302,17 @@ export function setSaveMirror(fn: (raw: string) => void): void {
   saveMirror = fn;
 }
 
+let lastBackup = 0;
+
 export function saveGame(state: GameState): void {
   const raw = JSON.stringify({ state, savedAt: Date.now() });
   try {
+    // rotate the previous save into the backup slot every few minutes
+    if (Date.now() - lastBackup > BACKUP_EVERY_MS) {
+      const prev = localStorage.getItem(SAVE_KEY);
+      if (prev) localStorage.setItem(BACKUP_KEY, prev);
+      lastBackup = Date.now();
+    }
     localStorage.setItem(SAVE_KEY, raw);
   } catch {
     /* storage may be unavailable (private mode) — the game still runs */
@@ -307,17 +320,111 @@ export function saveGame(state: GameState): void {
   saveMirror?.(raw);
 }
 
-export function loadGame(): { state: GameState; savedAt: number } | null {
+// ---------------------------------------------------------------------------
+// migrations and repair: an old or damaged save is upgraded, never thrown away
+
+type AnySave = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+/** Step migrations: MIGRATIONS[n] upgrades a version-n save to n+1. */
+const MIGRATIONS: Record<number, (s: AnySave) => void> = {
+  // v1 → v2: the retention, alliance, hunt and campaign systems arrived as optional
+  // fields; JSON turned Infinity into null for the next raid
+  1: (s) => {
+    if (s.nextRaidAt == null) s.nextRaidAt = Number.POSITIVE_INFINITY;
+  },
+};
+
+const num = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
+
+/**
+ * Fill anything missing or corrupt from a fresh game: new buildings, commanders,
+ * stats and resources added by later versions, and NaN where numbers should be.
+ */
+export function repairSave(raw: AnySave): GameState {
+  const fresh = newGame(num(raw.seed, 1), typeof raw.governor === 'string' ? raw.governor : 'Governor') as unknown as AnySave;
+  for (const k of Object.keys(fresh)) if (raw[k] === undefined || raw[k] === null) raw[k] = fresh[k];
+  if (raw.nextRaidAt == null) raw.nextRaidAt = Number.POSITIVE_INFINITY;
+  raw.time = num(raw.time, 0);
+  raw.speed = num(raw.speed, 1);
+  raw.gems = Math.max(0, num(raw.gems, 0));
+  raw.ap = num(raw.ap, MAX_AP);
+  for (const k of Object.keys(fresh.res)) raw.res[k] = Math.max(0, num(raw.res?.[k], 0));
+  for (const id of Object.keys(fresh.buildings)) {
+    const b = raw.buildings[id];
+    if (!b || typeof b !== 'object') raw.buildings[id] = fresh.buildings[id];
+    else {
+      b.type = fresh.buildings[id].type;
+      b.level = Math.max(0, Math.min(25, Math.floor(num(b.level, 0))));
+      b.collectedAt = num(b.collectedAt, raw.time);
+    }
+  }
+  for (const id of Object.keys(fresh.commanders)) {
+    const c = raw.commanders[id];
+    if (!c || typeof c !== 'object') raw.commanders[id] = fresh.commanders[id];
+    else {
+      const f = fresh.commanders[id];
+      c.id = id;
+      c.level = Math.max(1, num(c.level, 1));
+      c.xp = Math.max(0, num(c.xp, 0));
+      c.stars = Math.max(1, num(c.stars, f.stars));
+      c.sculptures = Math.max(0, num(c.sculptures, 0));
+      if (!Array.isArray(c.skills) || c.skills.length !== f.skills.length) c.skills = f.skills.map((v: number, i: number) => num(c.skills?.[i], v));
+    }
+  }
+  for (const k of Object.keys(fresh.stats)) raw.stats[k] = num(raw.stats[k], 0);
+  for (const k of ['jobs', 'marches', 'reports', 'questsClaimed', 'holyBuffs'] as const) if (!Array.isArray(raw[k])) raw[k] = [];
+  if (!Array.isArray(raw.world) || raw.world.length === 0) raw.world = fresh.world;
+  for (const k of ['troops', 'wounded', 'items', 'research'] as const) if (typeof raw[k] !== 'object') raw[k] = {};
+  raw.version = SAVE_VERSION;
+  return raw as unknown as GameState;
+}
+
+/** Upgrade a parsed save to the current version, or null if it is unusable or from a newer build. */
+export function migrateSave(raw: unknown): GameState | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const s = raw as AnySave;
+  const v = num(s.version, 0);
+  if (v < 1 || v > SAVE_VERSION) return null;
+  for (let n = v; n < SAVE_VERSION; n++) MIGRATIONS[n]?.(s);
+  return repairSave(s);
+}
+
+function readSave(key: string): { state: GameState; savedAt: number } | null {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as { state: GameState; savedAt: number };
-    if (parsed.state.version !== SAVE_VERSION) return null;
-    // JSON turns Infinity into null
-    if (parsed.state.nextRaidAt == null) parsed.state.nextRaidAt = Number.POSITIVE_INFINITY;
-    return parsed;
+    const parsed = JSON.parse(raw) as { state: unknown; savedAt: number };
+    const state = migrateSave(parsed.state);
+    return state ? { state, savedAt: num(parsed.savedAt, Date.now()) } : null;
   } catch {
     return null;
+  }
+}
+
+/** Load the save, falling back to the backup if the main slot is damaged. */
+export function loadGame(): { state: GameState; savedAt: number; recovered?: boolean } | null {
+  const main = readSave(SAVE_KEY);
+  if (main) return main;
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    // keep an unreadable or newer-version save aside instead of overwriting it
+    if (raw) localStorage.setItem(`${SAVE_KEY}.unreadable`, raw);
+  } catch {
+    /* ignore */
+  }
+  const backup = readSave(BACKUP_KEY);
+  return backup ? { ...backup, recovered: true } : null;
+}
+
+/** Swap in the backup save (used by the crash recovery screen). */
+export function restoreBackup(): boolean {
+  try {
+    const raw = localStorage.getItem(BACKUP_KEY);
+    if (!raw || !readSave(BACKUP_KEY)) return false;
+    localStorage.setItem(SAVE_KEY, raw);
+    return true;
+  } catch {
+    return false;
   }
 }
 

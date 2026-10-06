@@ -1,4 +1,5 @@
 import { img } from '../assets';
+import { troopIdSprite } from '../data/troops';
 import { COMMANDER_BY_ID } from '../data/commanders';
 import type { Game } from '../game/game';
 import { isHidden, marchPosition, maxBarbLevel, objSprite } from '../game/logic';
@@ -395,9 +396,8 @@ export class WorldView {
     const flip = m.toX < m.fromX ? -1 : 1;
     const types = Object.keys(m.troops)
       .filter((id) => (m.troops[id] ?? 0) > 0)
-      .sort((a, b) => (m.troops[b] ?? 0) - (m.troops[a] ?? 0))
-      .map((id) => id.split('_')[0]);
-    const ranks = m.kind === 'scout' ? ['cavalry'] : types.length ? [types[0], types[1] ?? types[0], types[0]] : ['infantry'];
+      .sort((a, b) => (m.troops[b] ?? 0) - (m.troops[a] ?? 0));
+    const ranks = m.kind === 'scout' ? ['cavalry_2'] : types.length ? [types[0], types[1] ?? types[0], types[0]] : ['infantry_1'];
     const slots: [number, number][] = [[0, 0], [-26, -10], [-26, 12]];
     ctx.save();
     ctx.translate(x, y);
@@ -409,8 +409,9 @@ export class WorldView {
     ctx.fill();
     // back ranks first
     const order = ranks.map((t, i) => ({ t, i })).sort((a, b) => slots[a.i][1] - slots[b.i][1]);
-    for (const { t, i } of order) {
-      const im = img(`unit_${t}`);
+    for (const { t: id, i } of order) {
+      const t = id.split('_')[0];
+      const im = img(troopIdSprite(id)) ?? img(`unit_${t}`);
       if (!im) continue;
       const bob = gathering ? 0 : Math.abs(Math.sin(this.time / 120 + i * 1.7)) * 3;
       const sz = t === 'cavalry' ? 58 : t === 'siege' ? 54 : 46;

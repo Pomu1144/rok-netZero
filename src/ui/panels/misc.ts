@@ -4,7 +4,7 @@ import { persistSave, setHaptics } from '../../native';
 import { SAVE_KEY } from '../../game/state';
 import { COMMANDERS, COMMANDER_BY_ID } from '../../data/commanders';
 import { ITEMS, type ItemId } from '../../data/items';
-import { TROOP_NAMES, TROOP_SPRITES } from '../../data/troops';
+import { TROOP_NAMES, troopIdSprite } from '../../data/troops';
 import type { TroopType } from '../../data/types';
 import { cityHallLevel, commanderBusy, hourlyIncome, totalPower, useResourceItem, useTome } from '../../game/logic';
 import { activeQuests, claimQuest, questDone, QUESTS } from '../../game/quests';
@@ -133,7 +133,7 @@ function lossTable(side: NonNullable<Report['body']['attacker']>): string {
   return `<table class="loss-table"><tr><th>Unit</th><th>Troops</th><th>Lost</th><th>Left</th></tr>${ids
     .map((k) => {
       const [t, tier] = k.split('_');
-      return `<tr><td>${icon(TROOP_SPRITES[t as TroopType], 18)} ${TROOP_NAMES[t as TroopType][Number(tier) - 1]}</td><td>${fmt(side.start[k])}</td><td class="neg">−${fmt(side.losses[k] ?? 0)}</td><td>${fmt(side.remaining[k] ?? 0)}</td></tr>`;
+      return `<tr><td>${icon(troopIdSprite(k), 18)} ${TROOP_NAMES[t as TroopType][Number(tier) - 1]}</td><td>${fmt(side.start[k])}</td><td class="neg">−${fmt(side.losses[k] ?? 0)}</td><td>${fmt(side.remaining[k] ?? 0)}</td></tr>`;
     })
     .join('')}</table>`;
 }
@@ -371,7 +371,7 @@ export function openProfile(ctx: UiCtx): void {
             .filter(([, n]) => n > 0)
             .map(([k, n]) => {
               const [t, tier] = k.split('_');
-              return `<span class="cost">${icon(TROOP_SPRITES[t as TroopType], 26)} ${TROOP_NAMES[t as TroopType][Number(tier) - 1]} · ${fmtFull(n)}</span>`;
+              return `<span class="cost">${icon(troopIdSprite(k), 26)} ${TROOP_NAMES[t as TroopType][Number(tier) - 1]} · ${fmtFull(n)}</span>`;
             })
             .join('') || '<span class="muted">No troops</span>'
         }</div>

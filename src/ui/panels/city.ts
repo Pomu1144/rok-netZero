@@ -17,7 +17,7 @@ import {
 import { ITEMS, type ItemId } from '../../data/items';
 import { PLOT_BY_ID } from '../../data/layout';
 import { TECHS, TECH_BY_ID } from '../../data/research';
-import { TIER_NAMES, TRAINED_AT, TROOP_NAMES, TROOP_SPRITES, troopCost, troopStats } from '../../data/troops';
+import { TIER_NAMES, TRAINED_AT, TROOP_NAMES, troopCost, troopIdSprite, troopSprite, troopStats } from '../../data/troops';
 import type { TroopType } from '../../data/types';
 import {
   FREE_FINISH_SECONDS,
@@ -200,13 +200,12 @@ export function openTrain(ctx: UiCtx, type: TroopType): void {
       amount = Math.min(amount, cap);
       const st = troopStats(type, tier);
       const job = trainingJob(s, type);
-      const hue = (t: number) => `filter:hue-rotate(${(t - 1) * 28}deg) saturate(${1 + t * 0.1}) drop-shadow(0 4px 4px rgba(0,0,0,.5))`;
-      const tabs = [1, 2, 3, 4, 5]
+            const tabs = [1, 2, 3, 4, 5]
         .map((t) => {
           const locked = t > maxTier;
           const id = `${type}_${t}`;
           return `<div class="tier-tab ${t === tier ? 'sel' : ''} ${locked ? 'locked' : ''}" data-act="tier" data-tier="${t}">
-            <img class="unit" src="${assetUrl(TROOP_SPRITES[type])}" style="${locked ? '' : hue(t)}" alt="">
+            <img class="unit" src="${assetUrl(troopSprite(type, t))}" alt="">
             <div class="tn">${TIER_NAMES[t - 1]}</div>
             <div class="count">${locked ? `${ink('i_lock', 12)} Lv.${TIER_UNLOCK[t - 1]}` : `${fmt(s.troops[id] ?? 0)} ready`}</div>
           </div>`;
@@ -216,7 +215,7 @@ export function openTrain(ctx: UiCtx, type: TroopType): void {
         <div class="tier-tabs">${tabs}</div>
         <div class="spacer"></div>
         <div class="unit-hero">
-          <img src="${assetUrl(TROOP_SPRITES[type])}" style="${hue(tier)}" alt="">
+          <img src="${assetUrl(troopSprite(type, tier))}" alt="">
           <div class="col">
             <div class="kicker">Tier ${TIER_NAMES[tier - 1]} · ${type}</div>
             <div class="cmd-name" style="font-size:24px">${TROOP_NAMES[type][tier - 1]}</div>
@@ -271,7 +270,7 @@ export function openTrain(ctx: UiCtx, type: TroopType): void {
         },
         train: () => {
           if (ctx.run((st) => startTraining(st, type, tier, amount), sfx.march)) {
-            toast(`Training ${fmt(amount)} ${TROOP_NAMES[type][tier - 1]}`, 'good', TROOP_SPRITES[type]);
+            toast(`Training ${fmt(amount)} ${TROOP_NAMES[type][tier - 1]}`, 'good', troopSprite(type, tier));
             h.close();
           }
         },
@@ -449,7 +448,7 @@ export function openHospital(ctx: UiCtx): void {
             ? `<table class="stat-table">${wounded
                 .map(([id, n]) => {
                   const [t, tier] = id.split('_');
-                  return `<tr><td>${icon(TROOP_SPRITES[t as TroopType], 28)} ${TROOP_NAMES[t as TroopType][Number(tier) - 1]}</td><td>${fmtFull(n)}</td></tr>`;
+                  return `<tr><td>${icon(troopIdSprite(id), 28)} ${TROOP_NAMES[t as TroopType][Number(tier) - 1]}</td><td>${fmtFull(n)}</td></tr>`;
                 })
                 .join('')}</table>
               <h3 class="sec">Cost of care</h3>${costHtml(s, plan.cost)}

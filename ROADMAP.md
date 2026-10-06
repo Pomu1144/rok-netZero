@@ -28,7 +28,7 @@ Legend: `[x]` done · `[ ]` to do · **(you)** needs the owner (accounts, signin
 ## Phase 3: depth
 
 - [x] Buildings change appearance at level tiers (Lv 1–9, 10–19, 20–25), new Higgsfield art
-- [ ] Distinct art for every troop tier
+- [x] Distinct art for every troop tier
 - [ ] Commander talent trees
 - [ ] Battle scene: animated clash view with skill cut-ins
 - [ ] AI alliance: help speedups, gifts, alliance chat flavour

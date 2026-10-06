@@ -13,7 +13,7 @@ import {
   xpToNext,
 } from '../../data/commanders';
 import { ITEMS } from '../../data/items';
-import { TROOP_NAMES, TROOP_SPRITES } from '../../data/troops';
+import { TROOP_NAMES, troopIdSprite } from '../../data/troops';
 import type { TroopType } from '../../data/types';
 import { troopPower } from '../../game/battle';
 import {
@@ -235,7 +235,7 @@ export function openMarch(ctx: UiCtx, targetId: string, kind: 'attack' | 'gather
                 .map((k) => {
                   const [ty, tier] = k.split('_');
                   return `<div class="troop-row">
-                    <img src="${assetUrl(TROOP_SPRITES[ty as TroopType])}" alt="">
+                    <img src="${assetUrl(troopIdSprite(k))}" alt="">
                     <div><div><b>${TROOP_NAMES[ty as TroopType][Number(tier) - 1]}</b> <span class="muted">· ${fmtFull(s.troops[k])} at home</span></div>
                     <input type="range" min="0" max="${s.troops[k]}" value="${sel[k] ?? 0}" data-troop="${k}"></div>
                     <input type="number" min="0" max="${s.troops[k]}" value="${sel[k] ?? 0}" data-troopn="${k}">

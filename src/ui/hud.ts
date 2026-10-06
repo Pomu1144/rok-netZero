@@ -2,8 +2,8 @@ import { assetUrl } from '../assets';
 import { marchSlots } from '../data/buildings';
 import { COMMANDER_BY_ID } from '../data/commanders';
 import { TECH_BY_ID } from '../data/research';
-import { TROOP_SPRITES } from '../data/troops';
-import { RES_KEYS, type TroopType } from '../data/types';
+import { troopIdSprite } from '../data/troops';
+import { RES_KEYS } from '../data/types';
 import { FREE_FINISH_SECONDS, canAfford, cityHallLevel, findObj, objLabel, totalPower, upgradeInfo } from '../game/logic';
 import { achievementBadge } from '../game/achievements';
 import { dailyBadge, dayKey, loginClaimable } from '../game/daily';
@@ -157,7 +157,7 @@ export class Hud {
       q.push(`<div class="queue idle" data-idle="1">${ink('i_hammer', 26)}<div class="q-main"><div class="q-title">Builder at rest</div><div class="q-sub">Tap to find work</div></div></div>`);
     }
     for (const j of s.jobs.filter((x) => x.kind !== 'build')) {
-      const ic = j.kind === 'research' ? ink(TECH_BY_ID[j.target].icon, 26) : j.kind === 'heal' ? ink('i_heal', 26) : `<img src="${assetUrl(TROOP_SPRITES[j.target.split('_')[0] as TroopType])}" alt="">`;
+      const ic = j.kind === 'research' ? ink(TECH_BY_ID[j.target].icon, 26) : j.kind === 'heal' ? ink('i_heal', 26) : `<img src="${assetUrl(troopIdSprite(j.target))}" alt="">`;
       q.push(`<div class="queue" data-job="${j.id}">${ic}<div class="q-main"><div class="q-title">${esc(jobTitle(this.ctx, j))}</div><div class="q-bar"><div data-start="${j.start}" data-end="${j.end}"></div></div></div><span class="q-time" data-end="${j.end}"></span></div>`);
     }
     if (s.marches.length) q.push('<div class="kicker" style="margin-top:6px">Marches</div>');

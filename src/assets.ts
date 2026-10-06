@@ -19,7 +19,8 @@ export type AssetName = (typeof NAMES)[number];
 
 /** Upgraded building art for the Lv 10 and Lv 20 tiers. */
 const TIERED = ['city_hall', 'watchtower', 'barracks', 'archery_range', 'stable', 'siege_workshop', 'farm', 'lumber_mill', 'quarry', 'gold_mine', 'academy', 'hospital', 'storehouse', 'scout_camp', 'tavern'];
-const ALL: string[] = [...NAMES, ...TIERED.flatMap((n) => [`${n}_t2`, `${n}_t3`])];
+const UNITS = ['infantry', 'archer', 'cavalry', 'siege'].flatMap((t) => [1, 2, 3, 4, 5].map((n) => `unit_${t}_${n}`));
+const ALL: string[] = [...NAMES, ...TIERED.flatMap((n) => [`${n}_t2`, `${n}_t3`]), ...UNITS];
 
 const images = new Map<string, HTMLImageElement>();
 

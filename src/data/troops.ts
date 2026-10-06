@@ -39,6 +39,17 @@ export const TROOP_SPRITES: Record<TroopType, string> = {
   siege: 'unit_siege',
 };
 
+/** Painted art for one troop tier (every tier has its own sprite). */
+export function troopSprite(type: TroopType, tier: number): string {
+  return `unit_${type}_${tier}`;
+}
+
+/** Art for a troop id such as "archer_3". */
+export function troopIdSprite(id: string): string {
+  const [type, tier] = id.split('_');
+  return troopSprite(type as TroopType, Number(tier) || 1);
+}
+
 export const TRAINED_AT: Record<TroopType, BuildingType> = {
   infantry: 'barracks',
   archer: 'archery_range',

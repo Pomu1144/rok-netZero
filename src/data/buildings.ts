@@ -34,6 +34,20 @@ export interface BuildingDef {
 
 export const MAX_LEVEL = 25;
 
+/** Buildings are repainted at these levels (Lv 1–9, 10–19, 20–25). */
+export const TIER_LEVELS = [10, 20] as const;
+
+export function buildingTier(level: number): 1 | 2 | 3 {
+  return level >= TIER_LEVELS[1] ? 3 : level >= TIER_LEVELS[0] ? 2 : 1;
+}
+
+/** The sprite a building shows at a given level. */
+export function spriteFor(type: BuildingType, level: number): string {
+  const base = BUILDINGS[type].sprite;
+  const tier = buildingTier(level);
+  return tier === 1 ? base : `${base}_t${tier}`;
+}
+
 export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   city_hall: {
     type: 'city_hall', name: 'City Hall', sprite: 'city_hall', size: 4, unlockCH: 1,

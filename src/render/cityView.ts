@@ -1,5 +1,5 @@
 import { img } from '../assets';
-import { BUILDINGS, type BuildingType } from '../data/buildings';
+import { BUILDINGS, spriteFor, type BuildingType } from '../data/buildings';
 import { CITY_GRID, PLOTS, type Plot } from '../data/layout';
 import type { Game } from '../game/game';
 import { cityHallLevel, plotUnlockLevel, producerCap, storedAmount, trainingJob } from '../game/logic';
@@ -140,12 +140,17 @@ export class CityView {
     }
   }
 
+  /** The building's art for its current level tier (falls back to the base art while loading). */
+  private spriteOf(p: Plot): HTMLImageElement | undefined {
+    return img(spriteFor(p.type, this.game.state.buildings[p.id].level)) ?? img(BUILDINGS[p.type].sprite);
+  }
+
   plotRect(p: Plot): { x: number; y: number; w: number; h: number; cx: number; bottom: number } {
     const def = BUILDINGS[p.type];
     const size = def.size;
     const center = isoToWorld(p.gx + size / 2, p.gy + size / 2);
     const bottom = isoToWorld(p.gx + size, p.gy + size).y;
-    const im = img(def.sprite);
+    const im = this.spriteOf(p);
     const scale = p.type === 'city_hall' ? 1.25 : p.type === 'wall' ? 1.3 : 1.18;
     const w = size * TW * scale;
     const h = im ? (w * im.naturalHeight) / im.naturalWidth : w;
@@ -294,7 +299,7 @@ export class CityView {
       const mid = (seg.a[0] + seg.b[0]) / 2 + (seg.a[1] + seg.b[1]) / 2;
       items.push({ depth: mid + 0.2, draw: () => this.drawWallSeg(ctx, seg) });
     }
-    const tower = img('watchtower');
+    const tower = img(spriteFor('wall', this.game.state.buildings.wall.level)) ?? img('watchtower');
     if (tower) {
       for (const [gx, gy] of [[WALL_MIN, WALL_MIN], [WALL_MAX, WALL_MIN], [WALL_MIN, WALL_MAX], [WALL_MAX, WALL_MAX]]) {
         const p = isoToWorld(gx, gy);
@@ -481,7 +486,7 @@ export class CityView {
       return;
     }
 
-    const im = img(def.sprite);
+    const im = this.spriteOf(p);
     if (!im) return;
     const r = this.plotRect(p);
     // squash & stretch after a level-up

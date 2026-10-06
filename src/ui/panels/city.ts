@@ -3,6 +3,9 @@ import { sfx } from '../../audio';
 import {
   BUILDINGS,
   MAX_LEVEL,
+  TIER_LEVELS,
+  buildingTier,
+  spriteFor,
   hospitalCapacity,
   marchSlots,
   maxTierForLevel,
@@ -105,10 +108,11 @@ export function openBuilding(ctx: UiCtx, plotId: string): void {
       const canGo = info.ok && canAfford(s, info.cost) && builders < s.builders;
       body.innerHTML = `
         <div class="bld-hero">
-          <div class="bld-art"><img src="${assetUrl(def.sprite)}" alt=""></div>
+          <div class="bld-art"><img src="${assetUrl(spriteFor(plot.type, b.level))}" alt=""></div>
           <div class="col">
             <div class="lvl-arrow"><small>LV</small>${b.level}${maxed ? '<small>MAX</small>' : `<span class="arr"></span><span class="to">${info.toLevel}</span>`}</div>
             <div class="desc">${esc(def.desc)}</div>
+            ${buildingTier(b.level) < 3 ? `<div class="bld-next"><img src="${assetUrl(spriteFor(plot.type, TIER_LEVELS[buildingTier(b.level) - 1]))}" alt=""><span>A grander look at <b>Lv.${TIER_LEVELS[buildingTier(b.level) - 1]}</b></span></div>` : ''}
             ${def.producer && b.level > 0 ? `<div class="muted">Yielding <b class="num">${fmt(productionRate(s, plotId))}</b> ${def.producer} per hour with all bonuses.</div>` : ''}
             ${plot.type === 'storehouse' && b.level > 0 ? `<div class="muted">Raids cannot take the first <b class="num">${fmt(resourceProtection(s))}</b> of each resource.</div>` : ''}
             ${rows.length ? `<table class="stat-table">${rows.map(([k, a, n]) => `<tr><td>${k}</td><td>${a}${a ? ' → ' : ''}<span class="up">${n}</span></td></tr>`).join('')}</table>` : ''}

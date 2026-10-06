@@ -3807,3 +3807,22 @@ canvas.flow {
     animation: none !important;
   }
 }
+
+/* next building tier preview */
+.bld-next {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--dim);
+}
+.bld-next img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  filter: grayscale(0.6) brightness(0.75) drop-shadow(0 3px 5px rgba(0, 0, 0, 0.5));
+}
+.bld-next b {
+  color: var(--accent-2);
+}

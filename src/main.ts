@@ -1,7 +1,7 @@
 import './style.css';
 import { assetUrl, loadAssets } from './assets';
 import { playMusic, setMuted, setMusic, sfx, unlockAudio } from './audio';
-import { BUILDINGS } from './data/buildings';
+import { BUILDINGS, TIER_LEVELS, spriteFor } from './data/buildings';
 import { COMMANDER_BY_ID } from './data/commanders';
 import { PLOT_BY_ID } from './data/layout';
 import { Game } from './game/game';
@@ -416,6 +416,15 @@ function onGameEvent(e: GameEvent): void {
       haptic('success');
       sfx.fanfare();
       toast(e.text, 'good', 'ink/i_hammer');
+      if (e.plotId && (TIER_LEVELS as readonly number[]).includes(game.state.buildings[e.plotId].level)) {
+        // crossing a tier repaints the building: make a moment of it
+        const b = game.state.buildings[e.plotId];
+        setTimeout(() => {
+          sfx.horn();
+          toast(`${BUILDINGS[b.type].name} rises anew · Lv.${b.level}`, 'good', spriteFor(b.type, b.level));
+        }, 700);
+        city.focusPlot(e.plotId);
+      }
       if (e.plotId) {
         city.levelUp(e.plotId);
         setTimeout(() => sfx.stamp(), 230);

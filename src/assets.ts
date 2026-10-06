@@ -17,6 +17,10 @@ const NAMES = [
 
 export type AssetName = (typeof NAMES)[number];
 
+/** Upgraded building art for the Lv 10 and Lv 20 tiers. */
+const TIERED = ['city_hall', 'watchtower', 'barracks', 'archery_range', 'stable', 'siege_workshop', 'farm', 'lumber_mill', 'quarry', 'gold_mine', 'academy', 'hospital', 'storehouse', 'scout_camp', 'tavern'];
+const ALL: string[] = [...NAMES, ...TIERED.flatMap((n) => [`${n}_t2`, `${n}_t3`])];
+
 const images = new Map<string, HTMLImageElement>();
 
 export function assetUrl(name: string): string {
@@ -31,14 +35,14 @@ export function img(name: string): HTMLImageElement | undefined {
 export function loadAssets(onProgress: (p: number) => void): Promise<void> {
   let done = 0;
   return Promise.all(
-    NAMES.map(
+    ALL.map(
       (n) =>
         new Promise<void>((resolve) => {
           const i = new Image();
           i.decoding = 'async';
           i.onload = i.onerror = () => {
             done++;
-            onProgress(done / NAMES.length);
+            onProgress(done / ALL.length);
             resolve();
           };
           i.src = assetUrl(n);

@@ -32,13 +32,16 @@ export interface BattleResult {
   attacker: SideOutcome;
   defender: SideOutcome;
   events: string[];
-  timeline: { a: number; d: number }[];
+  /** troops alive after each round; ca/cd name a skill the attacker/defender cast that round */
+  timeline: TimelinePoint[];
 }
 
 /** Casualties per round scale: tuned so even fights last ~25-35 rounds. */
 const K = 0.05;
 const MAX_ROUNDS = 80;
 const RAGE_PER_ROUND = 110;
+/** commanders enter battle half-raged, so their active skill lands in most fights */
+const START_RAGE = 500;
 
 interface Unit {
   id: string;
@@ -105,22 +108,30 @@ function applyKills(units: Unit[], kills: number[]): void {
   });
 }
 
+export interface TimelinePoint {
+  a: number;
+  d: number;
+  ca?: string;
+  cd?: string;
+}
+
 export function simulateBattle(attacker: BattleSide, defender: BattleSide): BattleResult {
   const A = buildUnits(attacker);
   const D = buildUnits(defender);
   const startA = total(A);
   const startD = total(D);
   const events: string[] = [];
-  const timeline: { a: number; d: number }[] = [{ a: startA, d: startD }];
+  const timeline: TimelinePoint[] = [{ a: startA, d: startD }];
 
   const sides = [
-    { side: attacker, me: A, foe: D, rage: 0, casts: 0, rallyRounds: 0, start: startA, foeSide: defender },
-    { side: defender, me: D, foe: A, rage: 0, casts: 0, rallyRounds: 0, start: startD, foeSide: attacker },
+    { side: attacker, me: A, foe: D, rage: START_RAGE, casts: 0, rallyRounds: 0, start: startA, foeSide: defender },
+    { side: defender, me: D, foe: A, rage: START_RAGE, casts: 0, rallyRounds: 0, start: startD, foeSide: attacker },
   ];
 
   let rounds = 0;
   while (rounds < MAX_ROUNDS && total(A) >= 1 && total(D) >= 1) {
     rounds++;
+    const point: TimelinePoint = { a: 0, d: 0 };
     // both sides strike simultaneously
     const dmgs = sides.map((s) => {
       let mult = 1;
@@ -145,6 +156,8 @@ export function simulateBattle(attacker: BattleSide, defender: BattleSide): Batt
       const skill = def.skills[0];
       const v = skill.values[cmd.skills[0] - 1];
       const skillMult = 1 + bonus(s.side.bonuses, 'skillDamage');
+      if (idx === 0) point.ca = skill.name;
+      else point.cd = skill.name;
       if (skill.effect === 'damage') {
         const extra = roundDamage(s.me, s.foe, (v / 1000) * 2.2 * skillMult);
         dmgs[idx] = dmgs[idx].map((k, i) => k + extra[i]);
@@ -164,7 +177,9 @@ export function simulateBattle(attacker: BattleSide, defender: BattleSide): Batt
 
     applyKills(D, dmgs[0]);
     applyKills(A, dmgs[1]);
-    timeline.push({ a: Math.round(total(A)), d: Math.round(total(D)) });
+    point.a = Math.round(total(A));
+    point.d = Math.round(total(D));
+    timeline.push(point);
   }
 
   const outcome = (units: Unit[], start: Troops, casts: number): SideOutcome => {

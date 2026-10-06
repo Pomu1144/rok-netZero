@@ -105,7 +105,7 @@ export interface ReportBody {
   attacker?: { name: string; portrait?: string; start: Troops; losses: Troops; remaining: Troops };
   defender?: { name: string; portrait?: string; start: Troops; losses: Troops; remaining: Troops };
   rewards?: Reward;
-  timeline?: { a: number; d: number }[];
+  timeline?: { a: number; d: number; ca?: string; cd?: string }[];
 }
 
 export interface Reward {

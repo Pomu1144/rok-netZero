@@ -14,6 +14,7 @@ import { closeAllModals, icon, onAct, openModal, rewardHtml, toast } from '../do
 import { esc, fmt, fmtFull } from '../format';
 import { ink } from '../ink';
 import { openCommanders, openTavern } from './army';
+import { canPlayBattle, playBattle } from '../battleScene';
 import { openResearch } from './city';
 
 export function openBag(ctx: UiCtx): void {
@@ -185,7 +186,7 @@ function reportDetail(r: Report): string {
   const seal = r.kind === 'gather' ? '採' : r.kind === 'scout' ? '偵' : r.win ? '勝' : r.win === false ? '敗' : '報';
   const verdict = r.win === undefined ? (r.kind === 'gather' ? 'Harvest' : r.kind === 'scout' ? 'Intelligence' : 'Dispatch') : r.win ? 'Victory' : 'Defeat';
   return `
-    <div class="verdict ${r.win === false ? 'lose' : ''}">${r.win ? '<div class="splat"></div>' : ''}<div class="vseal">${seal}</div><div><div class="kicker">${esc(r.title)}</div><div class="vtext">${verdict.toUpperCase()}</div></div></div>
+    <div class="verdict ${r.win === false ? 'lose' : ''}">${r.win ? '<div class="splat"></div>' : ''}<div class="vseal">${seal}</div><div><div class="kicker">${esc(r.title)}</div><div class="vtext">${verdict.toUpperCase()}</div></div>${canPlayBattle(r) ? `<button class="btn btn-gold watch-btn" data-act="watch" data-id="${r.id}">${ink('i_swords', 16)} Watch the battle</button>` : ''}</div>
     ${
       b.attacker && b.defender && r.kind !== 'scout'
         ? `<div class="vs">
@@ -226,6 +227,10 @@ export function openMail(ctx: UiCtx, focusId?: string): void {
       const flow = body.querySelector('canvas.flow') as HTMLCanvasElement | null;
       if (flow && sel?.body.timeline) requestAnimationFrame(() => drawFlow(flow, sel.body.timeline!));
       onAct(body, {
+        watch: (t) => {
+          const rep = ctx.game.state.reports.find((x) => x.id === t.dataset.id);
+          if (rep) playBattle(rep);
+        },
         pick: (t) => {
           selected = t.dataset.id!;
           sfx.click();

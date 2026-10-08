@@ -1,0 +1,119 @@
+<title>Realm of Kings Screens</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kaisei+Tokumin:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500&display=swap">
+<style>
+/* Layout: a scroll of ink-washed plates, grouped by where the player is in the game; tap a plate to view it full size. */
+:root {
+  --ink: #0e0d0c;
+  --paper: #171513;
+  --line: #3a3127;
+  --text: #ece4d4;
+  --muted: #a39682;
+  --gold: #c9a24e;
+  --seal: #b8322a;
+  --display: 'Kaisei Tokumin', 'Songti SC', Georgia, serif;
+  --body: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  color-scheme: dark;
+}
+body { background: var(--ink); color: var(--text); font-family: var(--body); line-height: 1.55; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: clamp(16px, 4vw, 40px); padding-block: 40px 72px; }
+header { display: grid; gap: 10px; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
+.eyebrow { font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(32px, 5vw, 52px); line-height: 1.1; margin: 0; text-wrap: balance; letter-spacing: 0.02em; }
+.lede { color: var(--muted); max-width: 62ch; margin: 0; }
+.lede b { color: var(--text); font-weight: 500; }
+section { display: grid; gap: 18px; padding-top: 44px; }
+.sec-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.seal { display: inline-grid; place-items: center; width: 30px; height: 30px; background: var(--seal); color: var(--text); font-family: var(--display); font-size: 17px; border-radius: 3px; flex: none; transform: translateY(4px); }
+h2 { font-family: var(--display); font-weight: 500; font-size: 24px; margin: 0; }
+.count { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); gap: 22px; }
+figure { margin: 0; display: grid; gap: 9px; min-width: 0; }
+figure button { all: unset; cursor: zoom-in; display: block; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; background: var(--paper); transition: border-color .2s, transform .2s; }
+figure button:hover { border-color: var(--gold); transform: translateY(-2px); }
+figure button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+figure img { display: block; width: 100%; height: auto; aspect-ratio: 956 / 440; object-fit: cover; }
+figcaption { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+figcaption span:last-child { color: var(--muted); font-size: 12.5px; text-align: right; }
+.box { position: fixed; inset: 0; background: color-mix(in srgb, var(--ink) 94%, transparent); display: grid; place-items: center; padding: 16px; z-index: 10; cursor: zoom-out; }
+.box img { max-width: 100%; max-height: calc(100% - 48px); border: 1px solid var(--line); border-radius: 4px; }
+.box p { margin: 12px 0 0; text-align: center; font-family: var(--display); font-size: 18px; }
+footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { figure button { transition: none; } figure button:hover { transform: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Realm of Kings · every screen</div>
+    <h1>Realm of Kings Screens</h1>
+    <p class="lede">All <b>27 screens</b> of the current build, captured from the real game at iPhone landscape size. The kingdom is a seeded late-game save: City Hall level 22, six generals, 44,400 troops. Tap any screen to see it full size.</p>
+  </header>
+  <main id="main"></main>
+  <footer>Captured from the build on branch claude/stoic-bardeen-vep38w with <code>tools/all-pages.mjs</code>.</footer>
+</div>
+<div class="box" id="box" hidden><div><img id="boxImg" alt=""><p id="boxCap"></p></div></div>
+
+<script>
+const GROUPS = [
+  ['門', 'Arrival', [
+    ['01-title', 'Title screen', 'Opens on launch'],
+  ]],
+  ['城', 'The city', [
+    ['02-city', 'City', 'Home view'],
+    ['03-building', 'Building upgrade', 'Tap a building, then Upgrade'],
+    ['04-train', 'Train troops', 'Barracks'],
+    ['05-hospital', 'Hospital', 'Heal the wounded'],
+    ['06-tavern', 'Tavern', 'Silver and gold chests'],
+    ['11-research', 'Academy research', 'Rail: Academy'],
+    ['07-profile', 'Governor profile', 'Tap your portrait'],
+  ]],
+  ['将', 'Generals', [
+    ['08-commanders', 'Generals', 'Rail: Generals'],
+    ['09-commander', 'General detail', 'Julius Caesar'],
+    ['10-talents', 'Talent tree', 'From a general'],
+  ]],
+  ['戦', 'Realm and war', [
+    ['22-realm', 'Realm map', 'Rail: Realm'],
+    ['23-march', 'March orders', 'Tap a target'],
+    ['24-kingdom', 'Kingdom map', 'Realm: Kingdom'],
+    ['26-report', 'Battle report', 'Rail: Reports'],
+    ['27-battle', 'Battle replay', 'Skill cut-in'],
+    ['28-victory', 'Battle result', 'End of replay'],
+    ['13-campaign', 'Campaign', 'Rail: Campaign'],
+  ]],
+  ['盟', 'Alliance', [
+    ['15-alliance', 'Alliance invitation', 'Before joining'],
+    ['16-alliance-hall', 'Alliance hall', 'After joining'],
+  ]],
+  ['令', 'Menus and events', [
+    ['12-bag', 'Satchel', 'Rail: Satchel'],
+    ['14-quests', 'Decrees', 'Rail: Decrees'],
+    ['17-calendar', 'Login gifts', 'Event: Gifts'],
+    ['18-daily', 'Daily duties', 'Event: Duties'],
+    ['19-hunt', 'Barbarian hunt', 'Event: Hunt'],
+    ['20-honours', 'Hall of honours', 'Event: Honours'],
+    ['21-settings', 'Court settings', 'Rail: Court'],
+  ]],
+];
+const main = document.getElementById('main');
+for (const [glyph, name, items] of GROUPS) {
+  const s = document.createElement('section');
+  s.innerHTML = `<div class="sec-head"><span class="seal" aria-hidden="true">${glyph}</span><h2>${name}</h2><span class="count">${items.length} screen${items.length > 1 ? 's' : ''}</span></div><div class="grid"></div>`;
+  const grid = s.querySelector('.grid');
+  for (const [file, title, where] of items) {
+    const f = document.createElement('figure');
+    f.innerHTML = `<button type="button" aria-label="View ${title} full size"><img src="${file}.jpg" alt="${title}" loading="lazy" width="956" height="440"></button><figcaption><span>${title}</span><span>${where}</span></figcaption>`;
+    f.querySelector('button').addEventListener('click', () => open(file, title));
+    grid.appendChild(f);
+  }
+  main.appendChild(s);
+}
+const box = document.getElementById('box');
+function open(file, title) {
+  document.getElementById('boxImg').src = file + '.jpg';
+  document.getElementById('boxImg').alt = title;
+  document.getElementById('boxCap').textContent = title;
+  box.hidden = false;
+}
+box.addEventListener('click', () => (box.hidden = true));
+addEventListener('keydown', (e) => { if (e.key === 'Escape') box.hidden = true; });
+</script>

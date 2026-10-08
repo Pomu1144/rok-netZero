@@ -75,7 +75,7 @@ export function openCommanders(ctx: UiCtx): void {
       const s = ctx.game.state;
       const list = [...COMMANDERS].sort((a, b) => Number(s.commanders[b.id].unlocked) - Number(s.commanders[a.id].unlocked));
       body.innerHTML = `<div class="cmd-grid">${list.map((c, i) => cmdCard(ctx, c.id, i * 0.05)).join('')}</div>
-        <p class="muted center" style="margin-top:16px;font-style:italic">Recruit generals from Tavern chests or by gathering their insignia. Barbarians and forts surrender insignia too.</p>`;
+        <p class="muted center" style="margin-top:16px;font-style:italic">Recruit generals from Tavern coffers or by gathering their insignia. Barbarians and forts surrender insignia too.</p>`;
       onAct(body, { cmd: (t) => openCommander(ctx, t.dataset.id!) });
     },
   });

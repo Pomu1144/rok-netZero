@@ -217,7 +217,7 @@ export function drawLegend(ctx: CanvasRenderingContext2D, x: number, y: number, 
     ['我', '#c9a24e', '#1d1a14', 'Your city'],
     ['城', '#9a2a22', '#fff3e6', 'Rival city'],
     ['聖', '#f4ecd6', '#8d6a26', 'Shrine'],
-    ['砦', '#5a1712', '#fff3e6', 'Barbarian fort'],
+    ['砦', '#5a1712', '#fff3e6', 'Barbarian stronghold'],
   ];
   ctx.save();
   ctx.globalAlpha = (k - 0.6) / 0.4;

@@ -190,7 +190,7 @@ function extraActions(ctx: UiCtx, type: keyof typeof BUILDINGS): string {
   if (def.trains) btn = `<button class="btn" data-act="train" data-type="${def.trains}">${ink('i_spear', 18)} Train ${def.trains}</button>`;
   if (type === 'academy') btn = `<button class="btn" data-act="research">${ink('i_research', 18)} Open the Academy</button>`;
   if (type === 'hospital') btn = `<button class="btn" data-act="heal">${ink('i_heal', 18)} Tend the wounded · ${fmt(sumTroops(s.wounded))}</button>`;
-  if (type === 'tavern') btn = `<button class="btn" data-act="tavern">${ink('i_chest', 18)} Open chests</button>`;
+  if (type === 'tavern') btn = `<button class="btn" data-act="tavern">${ink('i_chest', 18)} Open coffers</button>`;
   if (type === 'scout_camp') btn = `<button class="btn" data-act="world">${ink('i_eye', 18)} Scout the realm</button>`;
   return btn ? `<div class="action-row" style="justify-content:flex-start">${btn}</div>` : '';
 }

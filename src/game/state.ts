@@ -68,7 +68,7 @@ export interface WorldObj {
   /** stash for AI cities */
   loot?: Partial<Record<ResKey, number>>;
   power?: number;
-  /** holy site bonus */
+  /** shrine bonus */
   buff?: { key: string; value: number; label: string };
   heldUntil?: number;
   scoutedAt?: number;
@@ -141,6 +141,8 @@ export interface GameState {
   buildings: Record<string, BuildingState>;
   jobs: Job[];
   builders: number;
+  /** Upgrades waiting for a free builder; each starts on its own once it can. */
+  buildPlan?: string[];
   troops: Troops;
   wounded: Troops;
   commanders: Record<string, CommanderState>;

@@ -84,7 +84,7 @@ const fps = (ms) =>
 
 const result = { cpuSlowdown: RATE, titleReadyMs: cold };
 result.city = await fps(4000);
-await page.evaluate(() => document.querySelector('[data-nav=world]')?.click());
+await page.evaluate(() => document.querySelector('#hud .toggle')?.click());
 await page.waitForTimeout(1500);
 result.realm = await fps(4000);
 await page.evaluate(() => (window.__world.camera.zoom = 0.06));

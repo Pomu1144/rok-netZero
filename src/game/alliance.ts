@@ -103,9 +103,9 @@ const GIFT_REASONS: [1 | 2 | 3, string][] = [
   [1, 'felled a Lv.5 barbarian'],
   [1, 'gathered a mountain of timber'],
   [1, 'opened a tavern chest'],
-  [2, 'stormed a barbarian fort'],
+  [2, 'stormed a barbarian stronghold'],
   [2, 'bought the Merchant’s Bundle'],
-  [3, 'captured a Holy Site for the alliance'],
+  [3, 'captured a Shrine for the alliance'],
   [3, 'bought the Emperor’s Treasury'],
 ];
 
@@ -117,7 +117,7 @@ const BANTER = [
   'The Shrine of War changes hands again tonight…',
   'Thank you all for the help, my academy is nearly done.',
   'Who has spare stone? Asking for a wall.',
-  'Sun Tzu is worth every sculpture, trust me.',
+  'Sun Tzu is worth every insignia, trust me.',
   'Gather on the gold nodes near the river, they are untouched.',
   'Our lotus banner flies over three shrines now.',
   'Keep your troops in the hospital, not in the ground.',
@@ -128,7 +128,7 @@ const GREETINGS = ['Welcome to the Order, Governor!', 'Glad to have you with us.
 const REPLIES = ['Well said!', 'Ha, indeed.', 'Agreed, my lord.', 'For the Lotus!', 'Good to see you online.', 'Count me in.', 'Haha!', 'Stay safe out there.'];
 const THANKS = ['Any time!', 'That is what allies are for.', 'You owe me a drink at the tavern.', 'Happy to help.'];
 
-const WHATS = ['Upgrade City Hall', 'Upgrade Academy', 'Research Iron Working', 'Upgrade Barracks', 'Heal wounded', 'Research Masonry', 'Upgrade Wall', 'Research Horsemanship', 'Upgrade Stable', 'Upgrade Farm'];
+const WHATS = ['Upgrade Citadel', 'Upgrade Academy', 'Research Iron Working', 'Upgrade Barracks', 'Heal wounded', 'Research Masonry', 'Upgrade Wall', 'Research Horsemanship', 'Upgrade Stable', 'Upgrade Farm'];
 
 const MINUTE = 60_000;
 

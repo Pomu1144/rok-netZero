@@ -50,7 +50,7 @@ export function spriteFor(type: BuildingType, level: number): string {
 
 export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   city_hall: {
-    type: 'city_hall', name: 'City Hall', sprite: 'city_hall', size: 4, unlockCH: 1,
+    type: 'city_hall', name: 'Citadel', sprite: 'city_hall', size: 4, unlockCH: 1,
     desc: 'The heart of your kingdom. Its level caps every other building and unlocks new structures, march slots and troop tiers.',
     costWeight: { food: 1.6, wood: 1.6, stone: 1.0, gold: 0.6 }, timeWeight: 2.2,
   },
@@ -95,7 +95,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     costWeight: { food: 0.6, wood: 0.6 }, timeWeight: 0.7,
   },
   gold_mine: {
-    type: 'gold_mine', name: 'Goldmine', sprite: 'gold_mine', size: 2, unlockCH: 7, producer: 'gold',
+    type: 'gold_mine', name: 'Gold Mine', sprite: 'gold_mine', size: 2, unlockCH: 7, producer: 'gold',
     desc: 'Produces gold over time. Gold funds research and elite troops.',
     costWeight: { food: 0.6, wood: 0.6, stone: 0.4 }, timeWeight: 0.8,
   },
@@ -115,13 +115,13 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     costWeight: { food: 0.8, wood: 0.8, stone: 0.4 }, timeWeight: 0.9,
   },
   scout_camp: {
-    type: 'scout_camp', name: 'Scout Camp', sprite: 'scout_camp', size: 2, unlockCH: 2,
+    type: 'scout_camp', name: 'Watch Post', sprite: 'scout_camp', size: 2, unlockCH: 2,
     desc: 'Dispatch scouts to gather intelligence on enemy cities and strongholds. Higher levels make scouts faster.',
     costWeight: { food: 0.7, wood: 0.7 }, timeWeight: 0.8,
   },
   tavern: {
     type: 'tavern', name: 'Tavern', sprite: 'tavern', size: 2, unlockCH: 1,
-    desc: 'Open silver and gold chests to recruit commanders and earn sculptures.',
+    desc: 'Open bronze and jade coffers to recruit commanders and earn insignia.',
     costWeight: { food: 0.6, wood: 0.6 }, timeWeight: 0.8,
   },
 };

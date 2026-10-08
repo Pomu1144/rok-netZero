@@ -35,7 +35,7 @@ const SCENES = [
   { id: '04-generals', caption: 'Lead legendary generals' },
   { id: '05-talents', caption: "Shape every general's talents" },
   { id: '06-war', caption: 'March to war across the realm' },
-  { id: '07-kingdom', caption: 'Rule a realm of rivals and holy sites' },
+  { id: '07-kingdom', caption: 'Rule a realm of rivals and shrines' },
   { id: '08-campaign', caption: 'Conquer a story campaign' },
   { id: '09-alliance', caption: 'Rise together with your alliance' },
   { id: '10-hunt', caption: 'Hunt barbarians, top the leaderboard' },

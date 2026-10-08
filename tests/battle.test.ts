@@ -10,7 +10,7 @@ describe('battle timeline', () => {
     const firstCast = res.timeline.findIndex((p) => p.ca);
     expect(firstCast).toBeGreaterThan(0);
     expect(firstCast).toBeLessThanOrEqual(5);
-    expect(res.timeline[firstCast].ca).toBe('Veni, Vidi, Vici');
+    expect(res.timeline[firstCast].ca).toBe('Crossing the Rubicon');
     expect(res.timeline.every((p) => !p.cd)).toBe(true);
     expect(res.attacker.skillCasts).toBe(res.timeline.filter((p) => p.ca).length);
   });

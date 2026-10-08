@@ -75,7 +75,7 @@ export function openCommanders(ctx: UiCtx): void {
       const s = ctx.game.state;
       const list = [...COMMANDERS].sort((a, b) => Number(s.commanders[b.id].unlocked) - Number(s.commanders[a.id].unlocked));
       body.innerHTML = `<div class="cmd-grid">${list.map((c, i) => cmdCard(ctx, c.id, i * 0.05)).join('')}</div>
-        <p class="muted center" style="margin-top:16px;font-style:italic">Recruit generals from Tavern chests or by gathering their sculptures. Barbarians and forts surrender sculptures too.</p>`;
+        <p class="muted center" style="margin-top:16px;font-style:italic">Recruit generals from Tavern coffers or by gathering their insignia. Barbarians and forts surrender insignia too.</p>`;
       onAct(body, { cmd: (t) => openCommander(ctx, t.dataset.id!) });
     },
   });
@@ -121,7 +121,7 @@ export function openCommander(ctx: UiCtx, id: string): void {
                 : `<div class="card">${req(false, `Not yet recruited · ${c.sculptures} / ${UNLOCK_SCULPTURES[def.rarity]} sculptures`)}
                    <div class="action-row"><button class="btn btn-gold" data-act="unlock" ${c.sculptures < UNLOCK_SCULPTURES[def.rarity] ? 'disabled' : ''}>${ink('i_crown', 18)} Recruit</button></div></div>`
             }
-            <h3 class="sec">Skills <span class="muted">${icon('ic_sculpture', 16)} ${c.sculptures} sculptures</span></h3>
+            <h3 class="sec">Skills <span class="muted">${icon('ic_sculpture', 16)} ${c.sculptures} insignia</span></h3>
             <div>
             ${def.skills
               .map((sk, i) => {
@@ -334,7 +334,7 @@ export function openMarch(ctx: UiCtx, targetId: string, kind: 'attack' | 'gather
         }
         <div class="spacer"></div>
         <div class="march-stats">
-          <div class="mstat"><div class="v">${fmt(mine)}</div><div class="k">Power</div></div>
+          <div class="mstat"><div class="v">${fmtFull(mine)}</div><div class="k">Power</div></div>
           <div class="mstat"><div class="v">${fmt(troopLoad(s, sel, commanderId))}</div><div class="k">Load</div></div>
           <div class="mstat"><div class="v">${fmtTime(secs)}</div><div class="k">March</div></div>
           <div class="mstat"><div class="v">${ap ? `${icon('ic_ap', 18)}${ap}` : '—'}</div><div class="k">Action points</div></div>
@@ -394,9 +394,9 @@ export function openTavern(ctx: UiCtx): void {
         <div class="chest ${kind} ${shaking === kind ? 'shake' : ''}">
           <div class="chest-enso"></div>
           <div class="kicker">${kind === 'silver' ? 'Common fortune' : 'Royal fortune'}</div>
-          <div class="chest-title">${kind === 'silver' ? 'Silver Chest' : 'Gold Chest'}</div>
+          <div class="chest-title">${kind === 'silver' ? 'Bronze Coffer' : 'Jade Coffer'}</div>
           <img class="chest-img" src="${assetUrl('ic_chest')}" alt="">
-          <div class="muted" style="font-style:italic">${kind === 'silver' ? 'Epic generals, sculptures and supplies' : 'Legendary generals, many sculptures and gems'}</div>
+          <div class="muted" style="font-style:italic">${kind === 'silver' ? 'Epic generals, insignia and supplies' : 'Legendary generals, many insignia and gems'}</div>
           <div class="spacer"></div>
           ${free ? `<button class="btn btn-gold" data-act="open" data-kind="${kind}">Open · free</button>` : `<button class="btn" data-act="open" data-kind="${kind}" ${keys <= 0 ? 'disabled' : ''}>${icon(kind === 'silver' ? 'ic_key_silver' : 'ic_key_gold', 18)} Open · ${keys}</button>
              <div class="muted" style="margin-top:8px;font-size:11.5px">Free again in <span class="num" data-end="${at}"></span></div>`}
@@ -407,7 +407,7 @@ export function openTavern(ctx: UiCtx): void {
           ${chest('silver', s.tavern.silverFreeAt, s.items.silver_key ?? 0)}
           ${chest('gold', s.tavern.goldFreeAt, s.items.gold_key ?? 0)}
         </div>
-        <div class="muted center" style="margin-top:10px;font-size:11.5px">A free silver chest every ${SILVER_FREE_MS / 3600_000} hours · a free gold chest every ${GOLD_FREE_MS / 3600_000} hours</div>
+        <div class="muted center" style="margin-top:10px;font-size:11.5px">A free bronze coffer every ${SILVER_FREE_MS / 3600_000} hours · a free jade coffer every ${GOLD_FREE_MS / 3600_000} hours</div>
         ${reveal}`;
       onAct(body, {
         open: (t) => {

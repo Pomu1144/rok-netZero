@@ -232,8 +232,8 @@ export function upgradeInfo(s: GameState, plotId: string): UpgradeInfo {
   const reasons: string[] = [];
   const ch = cityHallLevel(s);
   if (b.level >= MAX_LEVEL) reasons.push('Maximum level reached');
-  if (ch < plotUnlockLevel(plotId)) reasons.push(`Requires City Hall Lv.${plotUnlockLevel(plotId)}`);
-  if (b.type !== 'city_hall' && toLevel > ch) reasons.push(`Requires City Hall Lv.${toLevel}`);
+  if (ch < plotUnlockLevel(plotId)) reasons.push(`Requires Citadel Lv.${plotUnlockLevel(plotId)}`);
+  if (b.type !== 'city_hall' && toLevel > ch) reasons.push(`Requires Citadel Lv.${toLevel}`);
   if (b.type === 'city_hall' && toLevel >= 3) {
     const wall = s.buildings.wall.level;
     if (wall < toLevel - 1) reasons.push(`Requires City Wall Lv.${toLevel - 1}`);
@@ -262,6 +262,81 @@ export function startUpgrade(s: GameState, plotId: string): Result {
   s.jobs.push({
     id: uid(s, 'j'), kind: 'build', target: plotId, start: s.time, end: s.time + info.seconds * 1000, amount: info.toLevel,
   });
+  return OK;
+}
+
+/** How many upgrades the build plan holds. */
+export const PLAN_SIZE = 3;
+
+/** Queue an upgrade to start by itself when a builder is free and it can be paid for. */
+export function planUpgrade(s: GameState, plotId: string): Result {
+  const plan = (s.buildPlan ??= []);
+  if (plan.includes(plotId)) return fail('Already in the plan');
+  if (plan.length >= PLAN_SIZE) return fail(`The plan holds ${PLAN_SIZE} upgrades`);
+  if (s.buildings[plotId].level >= MAX_LEVEL) return fail('Already at the highest level');
+  plan.push(plotId);
+  return OK;
+}
+
+export function unplanUpgrade(s: GameState, plotId: string): void {
+  s.buildPlan = (s.buildPlan ?? []).filter((id) => id !== plotId);
+}
+
+/**
+ * Start whatever the plan can start right now, in order. An entry whose
+ * requirements or cost aren't met yet waits without holding up the ones behind it.
+ */
+export function runBuildPlan(s: GameState): string[] {
+  const started: string[] = [];
+  for (const id of [...(s.buildPlan ?? [])]) {
+    if (activeBuildJobs(s).length >= s.builders) break;
+    if (s.buildings[id].level >= MAX_LEVEL) {
+      unplanUpgrade(s, id);
+      continue;
+    }
+    if (startUpgrade(s, id).ok) {
+      unplanUpgrade(s, id);
+      started.push(id);
+    }
+  }
+  return started;
+}
+
+/**
+ * The speedups that finish a timer with the least waste: whole items, biggest
+ * first, never overshooting; then, if time is still left, the one smallest item
+ * that finishes it. Returns the counts to use and the seconds they waste.
+ */
+export function bestSpeedups(s: GameState, jobId: string): { use: Partial<Record<ItemId, number>>; saved: number; waste: number } {
+  const job = s.jobs.find((j) => j.id === jobId);
+  const use: Partial<Record<ItemId, number>> = {};
+  if (!job) return { use, saved: 0, waste: 0 };
+  let left = remainingSeconds(s, job);
+  const kinds = (Object.keys(ITEMS) as ItemId[]).filter((i) => ITEMS[i].kind === 'speedup' && (s.items[i] ?? 0) > 0).sort((a, b) => ITEMS[b].value - ITEMS[a].value);
+  const have = (i: ItemId) => (s.items[i] ?? 0) - (use[i] ?? 0);
+  for (const i of kinds) {
+    const n = Math.min(have(i), Math.floor(left / ITEMS[i].value));
+    if (n > 0) {
+      use[i] = n;
+      left -= n * ITEMS[i].value;
+    }
+  }
+  if (left > 0) {
+    const finisher = [...kinds].reverse().find((i) => have(i) > 0 && ITEMS[i].value >= left);
+    if (finisher) {
+      use[finisher] = (use[finisher] ?? 0) + 1;
+      left -= ITEMS[finisher].value;
+    }
+  }
+  const total = remainingSeconds(s, job);
+  return { use, saved: Math.min(total, total - left), waste: Math.max(0, -left) };
+}
+
+export function useBestSpeedups(s: GameState, jobId: string): Result {
+  const { use } = bestSpeedups(s, jobId);
+  const ids = Object.keys(use) as ItemId[];
+  if (!ids.length) return fail('No speedups to use');
+  for (const i of ids) useSpeedupItem(s, jobId, i, use[i]!);
   return OK;
 }
 
@@ -601,7 +676,7 @@ export function validateMarch(s: GameState, o: MarchOrder): Result {
     return fail('No free march slots');
   }
   if (o.kind === 'scout') {
-    if (buildingLevel(s, 'scout_camp') <= 0) return fail('Build a Scout Camp first');
+    if (buildingLevel(s, 'scout_camp') <= 0) return fail('Build a Watch Post first');
     if (s.marches.some((m) => m.kind === 'scout')) return fail('Scout already out');
     return OK;
   }
@@ -906,10 +981,10 @@ function finishMarch(s: GameState, m: March, events: GameEvent[]): void {
 export function objLabel(o: WorldObj): string {
   switch (o.kind) {
     case 'barbarian': return `Lv.${o.level} Barbarians`;
-    case 'fort': return `Lv.${o.level} Barbarian Fort`;
+    case 'fort': return `Lv.${o.level} Barbarian Stronghold`;
     case 'node': return `Lv.${o.level} ${{ food: 'Cropland', wood: 'Logging Camp', stone: 'Stone Deposit', gold: 'Gold Deposit' }[o.res!]}`;
     case 'city': return `${o.name} (Lv.${o.level})`;
-    case 'holy': return o.name ?? 'Holy Site';
+    case 'holy': return o.name ?? 'Shrine';
     default: return o.deco ?? 'Wilds';
   }
 }
@@ -1021,7 +1096,7 @@ export function tick(s: GameState, dtGameMs: number, rng: Rng): GameEvent[] {
       b.level = j.amount;
       b.collectedAt = s.time;
       events.push({ kind: 'build', text: `${BUILDINGS[b.type].name} upgraded to Lv.${b.level}`, good: true, plotId: j.target });
-      if (b.type === 'city_hall') allianceCheer(s, `Congratulations on City Hall Lv.${b.level}, my lord!`, rng);
+      if (b.type === 'city_hall') allianceCheer(s, `Congratulations on Citadel Lv.${b.level}, my lord!`, rng);
     } else if (j.kind === 'research') {
       s.research[j.target] = j.amount;
       s.stats.researchDone++;
@@ -1035,6 +1110,7 @@ export function tick(s: GameState, dtGameMs: number, rng: Rng): GameEvent[] {
       events.push({ kind: 'heal', text: `${j.amount.toLocaleString()} troops healed`, good: true });
     }
   }
+  for (const id of runBuildPlan(s)) events.push({ kind: 'build', text: `Planned upgrade begun: ${BUILDINGS[s.buildings[id].type].name}`, good: true, plotId: id });
 
   // marches (process in event order; a march may advance several phases in one big tick)
   for (let guard = 0; guard < 200; guard++) {

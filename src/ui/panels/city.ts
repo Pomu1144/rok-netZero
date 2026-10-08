@@ -21,12 +21,14 @@ import { TIER_NAMES, TRAINED_AT, TROOP_NAMES, troopCost, troopIdSprite, troopSpr
 import type { TroopType } from '../../data/types';
 import {
   FREE_FINISH_SECONDS,
+  bestSpeedups,
   buildingLevel,
   canAfford,
   cancelJob,
   finishWithGems,
   gemCostToFinish,
   healPlan,
+  planUpgrade,
   hospitalCap,
   productionRate,
   remainingSeconds,
@@ -39,7 +41,9 @@ import {
   startUpgrade,
   trainSeconds,
   trainingJob,
+  unplanUpgrade,
   upgradeInfo,
+  useBestSpeedups,
   useSpeedupItem,
 } from '../../game/logic';
 import { sumTroops, type Job } from '../../game/state';
@@ -108,6 +112,7 @@ export function openBuilding(ctx: UiCtx, plotId: string): void {
       const rows = maxed ? [] : buildingStats(plot.type, b.level, info.toLevel, ctx);
       const builders = s.jobs.filter((j) => j.kind === 'build').length;
       const canGo = info.ok && canAfford(s, info.cost) && builders < s.builders;
+      const planned = (s.buildPlan ?? []).includes(plotId);
       body.innerHTML = `
         <div class="bld-hero">
           <div class="bld-art"><img src="${assetUrl(spriteFor(plot.type, b.level))}" alt=""></div>
@@ -140,8 +145,16 @@ export function openBuilding(ctx: UiCtx, plotId: string): void {
                  </div>
                  <div class="action-row">
                    ${timeChip(info.seconds)}
+                   ${
+                     canGo
+                       ? ''
+                       : planned
+                         ? `<button class="btn" data-act="unplan">${ink('i_scroll', 18)} In the plan · remove</button>`
+                         : `<button class="btn" data-act="plan" title="Starts by itself when a builder is free and you can pay">${ink('i_scroll', 18)} Add to build plan</button>`
+                   }
                    <button class="btn btn-gold btn-xl" data-act="upgrade" ${canGo ? '' : 'disabled'}>${ink('i_hammer', 20)} ${b.level > 0 ? 'Upgrade' : 'Construct'}</button>
-                 </div>`
+                 </div>
+                 ${!canGo && !planned ? '<div class="muted plan-note">Planned upgrades start on their own, even while you are away, once a builder is free and the cost is in your stores.</div>' : ''}`
         }
         ${b.level > 0 ? extraActions(ctx, plot.type) : ''}`;
       onAct(body, {
@@ -151,6 +164,10 @@ export function openBuilding(ctx: UiCtx, plotId: string): void {
             h.close();
           }
         },
+        plan: () => {
+          if (ctx.run((st) => planUpgrade(st, plotId), sfx.click)) toast(`${def.name} added to the build plan`, 'good', 'ink/i_scroll');
+        },
+        unplan: () => ctx.run((st) => void unplanUpgrade(st, plotId)),
         cancel: () => job && ctx.run((st) => cancelJob(st, job.id)),
         speed: () => job && openSpeedup(ctx, job.id),
         train: (t) => openTrain(ctx, t.dataset.type as TroopType),
@@ -173,7 +190,7 @@ function extraActions(ctx: UiCtx, type: keyof typeof BUILDINGS): string {
   if (def.trains) btn = `<button class="btn" data-act="train" data-type="${def.trains}">${ink('i_spear', 18)} Train ${def.trains}</button>`;
   if (type === 'academy') btn = `<button class="btn" data-act="research">${ink('i_research', 18)} Open the Academy</button>`;
   if (type === 'hospital') btn = `<button class="btn" data-act="heal">${ink('i_heal', 18)} Tend the wounded · ${fmt(sumTroops(s.wounded))}</button>`;
-  if (type === 'tavern') btn = `<button class="btn" data-act="tavern">${ink('i_chest', 18)} Open chests</button>`;
+  if (type === 'tavern') btn = `<button class="btn" data-act="tavern">${ink('i_chest', 18)} Open coffers</button>`;
   if (type === 'scout_camp') btn = `<button class="btn" data-act="world">${ink('i_eye', 18)} Scout the realm</button>`;
   return btn ? `<div class="action-row" style="justify-content:flex-start">${btn}</div>` : '';
 }
@@ -495,6 +512,7 @@ export function openSpeedup(ctx: UiCtx, jobId: string): void {
       const free = secs <= FREE_FINISH_SECONDS && job.kind === 'build';
       const gems = gemCostToFinish(secs);
       const items = (['speed_1m', 'speed_5m', 'speed_15m', 'speed_60m'] as ItemId[]).filter((i) => (s.items[i] ?? 0) > 0);
+      const best = bestSpeedups(s, jobId);
       body.innerHTML = `
         <div class="kicker">In progress</div>
         <div style="font-weight:700;font-size:16px;margin:2px 0 10px">${esc(jobTitle(ctx, job))}</div>
@@ -508,6 +526,11 @@ export function openSpeedup(ctx: UiCtx, jobId: string): void {
               : ''
         }
         <h3 class="sec">Speedups</h3>
+        ${
+          best.saved > 0
+            ? `<div class="row card best-speed"><span class="seal-sm">最</span><div class="grow"><b>Best use of your speedups</b><div class="muted">${Object.entries(best.use).map(([i, n]) => `${n} × ${ITEMS[i as ItemId].name}`).join(' · ')}<br>Saves ${fmtTime(best.saved)}${best.waste ? ` · wastes ${fmtTime(best.waste)}` : ' · nothing wasted'}</div></div><button class="btn btn-sm btn-gold" data-act="best">Use</button></div>`
+            : ''
+        }
         ${
           items.length
             ? items
@@ -527,6 +550,7 @@ export function openSpeedup(ctx: UiCtx, jobId: string): void {
           h.close();
         },
         use: (t) => ctx.run((st) => useSpeedupItem(st, jobId, t.dataset.item as ItemId), sfx.coin),
+        best: () => ctx.run((st) => useBestSpeedups(st, jobId), sfx.coin),
         help: () => {
           if (ctx.run((st) => (askHelp(st, jobId) ? { ok: true } : { ok: false, reason: 'Already requested' }), sfx.horn)) toast('Your allies answer the call', 'good', 'al_help');
         },

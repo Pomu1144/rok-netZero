@@ -24,7 +24,7 @@ import type { Reward } from '../../game/state';
 import { haptic } from '../../native';
 import type { UiCtx } from '../ctx';
 import { icon, onAct, openModal, toast } from '../dom';
-import { esc, fmt } from '../format';
+import { esc, fmt, fmtFull } from '../format';
 import { ink } from '../ink';
 import { celebrate } from './daily';
 
@@ -103,12 +103,12 @@ export function openAlliance(ctx: UiCtx, start: Tab = 'hall'): void {
             <div class="col" style="gap:8px">
               <div class="al-stats">
                 <div><span class="kicker">Members</span><b class="num">${MEMBERS.length + 1} / 50</b></div>
-                <div><span class="kicker">Alliance power</span><b class="num">${fmt(roster.reduce((n, m) => n + m.power, 0))}</b></div>
+                <div><span class="kicker">Alliance power</span><b class="num">${fmtFull(roster.reduce((n, m) => n + m.power, 0))}</b></div>
                 <div><span class="kicker">Credits</span><b class="num">${fmt(a.credits)}</b></div>
                 <div><span class="kicker">Helps given · received</span><b class="num">${fmt(a.helpsGiven)} · ${fmt(a.helpsReceived)}</b></div>
               </div>
               <div class="al-roster">${roster
-                .map((m) => `<div class="al-member ${m.me ? 'me' : ''}"><span class="al-seal ${m.me ? 'me' : ''}">${m.seal}</span><div class="grow"><b>${esc(m.name)}</b><div class="kicker">${m.rank}</div></div><span class="num muted">${fmt(m.power)}</span></div>`)
+                .map((m) => `<div class="al-member ${m.me ? 'me' : ''}"><span class="al-seal ${m.me ? 'me' : ''}">${m.seal}</span><div class="grow"><b>${esc(m.name)}</b><div class="kicker">${m.rank}</div></div><span class="num muted">${fmtFull(m.power)}</span></div>`)
                 .join('')}</div>
             </div>
           </div>`;

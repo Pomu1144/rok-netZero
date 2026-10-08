@@ -4,10 +4,10 @@ import { COMMANDER_BY_ID } from '../data/commanders';
 import { TECH_BY_ID } from '../data/research';
 import { troopIdSprite } from '../data/troops';
 import { RES_KEYS } from '../data/types';
-import { FREE_FINISH_SECONDS, canAfford, cityHallLevel, findObj, objLabel, totalPower, upgradeInfo } from '../game/logic';
+import { FREE_FINISH_SECONDS, canAfford, cityHallLevel, totalPower, upgradeInfo } from '../game/logic';
 import { achievementBadge } from '../game/achievements';
 import { huntBadge } from '../game/hunt';
-import { allianceBadge, canAskHelp } from '../game/alliance';
+import { ALLIANCE, MEMBER_BY_ID, allianceBadge, canAskHelp } from '../game/alliance';
 import { dailyBadge, dayKey, loginClaimable } from '../game/daily';
 import { activeQuests, questDone } from '../game/quests';
 import { MAX_AP, type Job } from '../game/state';
@@ -31,15 +31,41 @@ export interface HudHandlers {
   kingdom: () => void;
 }
 
+/** The round buttons in the bottom-right tray. */
 const NAV: [string, InkIcon, string][] = [
-  ['commanders', 'i_helmet', 'Generals'],
-  ['research', 'i_research', 'Academy'],
-  ['bag', 'i_bag', 'Satchel'],
   ['campaign', 'i_swords', 'Campaign'],
-  ['quests', 'i_scroll', 'Decrees'],
+  ['bag', 'i_bag', 'Satchel'],
   ['alliance', 'i_banner', 'Alliance'],
-  ['mail', 'i_mail', 'Reports'],
+  ['commanders', 'i_helmet', 'Generals'],
 ];
+/** Folded behind the tray's "More" button. */
+const MORE: [string, InkIcon, string][] = [
+  ['research', 'i_research', 'Academy'],
+  ['quests', 'i_scroll', 'Decrees'],
+  ['mail', 'i_mail', 'Reports'],
+  ['settings', 'i_gear', 'Court'],
+];
+
+/** The age a City Hall level belongs to, shown under the resources. */
+export function ageOf(level: number): string {
+  return level >= 22 ? 'Imperial Age' : level >= 16 ? 'Feudal Age' : level >= 10 ? 'Iron Age' : level >= 5 ? 'Bronze Age' : 'Stone Age';
+}
+
+const FOLD_KEY = 'rok.worksOpen';
+function readFold(): boolean {
+  try {
+    return localStorage.getItem(FOLD_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+function writeFold(open: boolean): void {
+  try {
+    localStorage.setItem(FOLD_KEY, open ? '1' : '0');
+  } catch {
+    /* private mode: the fold just isn't remembered */
+  }
+}
 
 const RES_LABEL: Record<string, string> = { food: 'Food', wood: 'Wood', stone: 'Stone', gold: 'Gold', gems: 'Gems' };
 
@@ -52,51 +78,76 @@ export class Hud {
   constructor(private ctx: UiCtx, private h: HudHandlers) {
     this.root.innerHTML = '';
     this.root.appendChild(el('<div class="edge-shade"></div>'));
-    this.root.appendChild(
-      el(`<nav class="rail" aria-label="Main">
-        <div class="rail-brand"><img class="enso" src="${assetUrl('ink/ink_enso_gold')}" alt=""><img class="crown ic" src="${assetUrl('ink/i_crown')}" alt=""></div>
-        <button class="rail-btn" data-nav="city">${ink('i_castle', 28)}<span>City</span></button>
-        <button class="rail-btn" data-nav="world">${ink('i_map', 28)}<span>Realm</span></button>
-        <div class="rail-sep"></div>
-        ${NAV.map(([id, ic, label]) => `<button class="rail-btn" data-nav="${id}">${ink(ic, 28)}<span>${label}</span><span class="badge hidden" data-badge="${id}"></span></button>`).join('')}
-        <div class="rail-spacer"></div>
-        <button class="rail-btn" data-nav="settings">${ink('i_gear', 24)}<span>Court</span></button>
-      </nav>`),
-    );
-    this.root.appendChild(
-      el(`<div class="hud-top">
-        <div class="gov" data-part="gov"></div>
-        <div class="cur" data-part="res"></div>
-      </div>`),
-    );
     const add = (cls: string, part: string) => {
       const e = el(`<div class="${cls}" data-part="${part}"></div>`);
       this.root.appendChild(e);
       return e;
     };
-    add('queues', 'queues');
-    add('quest-slip', 'quest');
-    add('raid hidden', 'raid');
+    // top left: governor seal, power plate, AP and buffs
+    add('gov', 'gov');
     add('buffs', 'buffs');
+    // top right: resources, then the age and the events under them
+    add('cur', 'res');
     this.root.appendChild(
-      el(`<div class="events" data-part="events">
-        <button class="ev-btn" data-nav="calendar" aria-label="Login gifts"><img src="${assetUrl('ev_calendar')}" alt=""><span>Gifts</span><span class="badge hidden" data-badge="calendar"></span></button>
-        <button class="ev-btn" data-nav="daily" aria-label="Daily duties"><img src="${assetUrl('ev_daily')}" alt=""><span>Duties</span><span class="badge hidden" data-badge="daily"></span></button>
-        <button class="ev-btn" data-nav="hunt" aria-label="Barbarian hunt"><img src="${assetUrl('ev_hunt')}" alt=""><span>Hunt</span><span class="badge hidden" data-badge="hunt"></span></button>
-        <button class="ev-btn" data-nav="honours" aria-label="Hall of honours"><img src="${assetUrl('ev_honours')}" alt=""><span>Honours</span><span class="badge hidden" data-badge="honours"></span></button>
+      el(`<div class="tr-stack">
+        <div class="age" data-part="age"></div>
+        <div class="events" data-part="events">
+          <button class="ev-btn" data-nav="calendar" aria-label="Login gifts"><img src="${assetUrl('ev_calendar')}" alt=""><span>Gifts</span><span class="badge hidden" data-badge="calendar"></span></button>
+          <button class="ev-btn" data-nav="daily" aria-label="Daily duties"><img src="${assetUrl('ev_daily')}" alt=""><span>Duties</span><span class="badge hidden" data-badge="daily"></span></button>
+          <button class="ev-btn" data-nav="hunt" aria-label="Barbarian hunt"><img src="${assetUrl('ev_hunt')}" alt=""><span>Hunt</span><span class="badge hidden" data-badge="hunt"></span></button>
+          <button class="ev-btn" data-nav="honours" aria-label="Hall of honours"><img src="${assetUrl('ev_honours')}" alt=""><span>Honours</span><span class="badge hidden" data-badge="honours"></span></button>
+          <button class="ev-btn scroll" data-nav="quests" aria-label="Decrees">${ink('i_scroll', 40)}<span>Decrees</span><span class="badge hidden" data-badge="quests"></span></button>
+        </div>
       </div>`),
     );
+    // right edge: armies in the field
+    add('troops', 'troops');
+    // left: the decree slip, and the works list folded out from it
+    this.root.appendChild(
+      el(`<div class="left-col">
+        <div class="slip-row"><div class="quest-slip" data-part="quest"></div><button class="fold" data-fold="1" aria-label="Show works and marches"><span></span></button></div>
+        <div class="queues" data-part="queues"></div>
+      </div>`),
+    );
+    add('raid hidden', 'raid');
+    // bottom left: realm/city ensō, the builders' hammer, alliance chat
     this.root.appendChild(
       el(`<button class="toggle" data-part="toggle" aria-label="Switch view">
         <span class="disc"></span><img class="enso" src="${assetUrl('ink/ink_enso_gold')}" alt="">
         <span class="tic" data-role="tic"></span><span class="tcap" data-role="tcap"></span>
       </button>`),
     );
+    this.root.appendChild(el(`<button class="orb build" data-idle="1" aria-label="Builders">${ink('i_hammer', 30)}<span class="badge hidden" data-badge="builders"></span></button>`));
+    add('chat-strip hidden', 'chat');
     add('world-tools', 'worldtools');
+    // bottom right: reports above the tray of round buttons
+    this.root.appendChild(el(`<button class="orb mail" data-nav="mail" aria-label="Reports">${ink('i_mail', 28)}<span class="badge hidden" data-badge="mail"></span></button>`));
+    this.root.appendChild(
+      el(`<nav class="tray" aria-label="Main">
+        ${NAV.map(([id, ic, label]) => `<button class="tray-btn" data-nav="${id}"><span class="orb-face">${ink(ic, 30)}</span><span class="lbl">${label}</span><span class="badge hidden" data-badge="${id}"></span></button>`).join('')}
+        <button class="tray-btn more" data-more="1" aria-label="More" aria-expanded="false"><span class="orb-face"><i></i><i></i><i></i></span><span class="lbl">More</span></button>
+      </nav>`),
+    );
+    this.root.appendChild(
+      el(`<div class="more-menu hidden" data-part="more">
+        ${MORE.map(([id, ic, label]) => `<button class="more-btn" data-nav="${id}">${ink(ic, 24)}<span>${label}</span></button>`).join('')}
+      </div>`),
+    );
     this.root.querySelectorAll<HTMLElement>('[data-part]').forEach((e) => (this.parts[e.dataset.part!] = e));
+    this.root.classList.toggle('works-open', readFold());
 
     this.root.addEventListener('click', (e) => {
       const t = e.target as HTMLElement;
+      const more = !!t.closest('[data-more]');
+      this.parts.more.classList.toggle('hidden', !more || !this.parts.more.classList.contains('hidden'));
+      this.root.querySelector('[data-more]')!.setAttribute('aria-expanded', String(!this.parts.more.classList.contains('hidden')));
+      if (more) return;
+      if (t.closest('[data-fold]')) {
+        const open = !this.root.classList.contains('works-open');
+        this.root.classList.toggle('works-open', open);
+        writeFold(open);
+        return;
+      }
       const nav = t.closest('[data-nav]') as HTMLElement | null;
       if (nav) return this.h.openNav(nav.dataset.nav!);
       const help = t.closest('[data-help]') as HTMLElement | null;
@@ -106,9 +157,11 @@ export class Hud {
       const march = t.closest('[data-march]') as HTMLElement | null;
       if (march) return this.h.openMarchInfo(march.dataset.march!);
       if (t.closest('[data-idle]')) return this.h.idleBuilder();
+      if (t.closest('[data-slot]')) return this.h.openNav('world');
       if (t.closest('[data-part=toggle]')) return this.h.toggleView();
       if (t.closest('[data-part=quest]')) return this.h.questClick();
       if (t.closest('[data-part=raid]')) return this.h.raidClick();
+      if (t.closest('[data-part=chat]')) return this.h.openNav('chat');
       if (t.closest('[data-part=gov]')) return this.h.profile();
       if (t.closest('[data-home]')) return this.h.home();
       if (t.closest('[data-kingdom]')) return this.h.kingdom();
@@ -142,13 +195,13 @@ export class Hud {
 
   update(worldCoords?: { x: number; y: number }): void {
     const s = this.ctx.game.state;
+    const ch = cityHallLevel(s);
     this.set(
       'gov',
-      `<div class="gov-avatar" style="background-image:url(${assetUrl('city_player')})"><span class="seal">${cityHallLevel(s)}</span></div>
+      `<div class="gov-avatar" style="background-image:url(${assetUrl('city_player')})"><img class="ring" src="${assetUrl('ink/ink_enso_gold')}" alt=""><span class="seal">${ch}</span></div>
        <div class="gov-info">
-         <div class="gov-name">${esc(s.governor)}</div>
-         <div class="gov-power"><span class="kicker">Power</span><span class="num">${fmt(totalPower(s))}</span></div>
-         <div class="ap"><span class="kicker">AP</span><div class="gauge ap"><div style="width:${(s.ap / MAX_AP) * 100}%"></div></div><small>${Math.floor(s.ap)}</small></div>
+         <div class="gov-power" title="Power">${ink('i_swords', 18)}<span class="num">${totalPower(s).toLocaleString('en-US')}</span></div>
+         <div class="gov-sub"><span class="gov-name">${esc(s.governor)}</span><span class="ap" title="Action points">${ink('i_flame', 14)}<span class="gauge ap"><span style="width:${(s.ap / MAX_AP) * 100}%"></span></span><small>${Math.floor(s.ap)}</small></span></div>
        </div>`,
     );
     this.set(
@@ -156,10 +209,38 @@ export class Hud {
       [...RES_KEYS, 'gems' as const]
         .map((k) => {
           const v = k === 'gems' ? s.gems : s.res[k];
-          return `<div class="cur-item ${k === 'gems' ? 'gems' : ''}" data-res="${k}" title="${RES_LABEL[k]}"><img src="${assetUrl(`ic_${k}`)}" alt=""><span class="v">${fmt(v)}</span><span class="k">${RES_LABEL[k]}</span></div>`;
+          return `<div class="cur-item ${k === 'gems' ? 'gems' : ''}" data-res="${k}" title="${RES_LABEL[k]}"><img src="${assetUrl(`ic_${k}`)}" alt=""><span class="v">${fmt(v)}</span>${k === 'gems' ? '<span class="plus" aria-hidden="true">+</span>' : ''}</div>`;
         })
         .join(''),
     );
+    this.set('age', `<b>${ageOf(ch)}</b><span>City Hall ${ch}</span>`);
+
+    // armies in the field, one portrait per march, then one free slot to send another
+    const slots = marchSlots(ch);
+    const out = s.marches.filter((m) => m.kind !== 'scout');
+    const troops = [`<div class="troops-head"><b>${out.length}</b>/${slots}</div>`];
+    for (const m of s.marches) {
+      const pic = m.commanderId ? `<img src="${assetUrl(COMMANDER_BY_ID[m.commanderId].portrait)}" alt="">` : ink('i_eye', 30);
+      const state = m.phase === 'returning' ? 'i_recall' : m.phase === 'gathering' || m.kind === 'gather' ? 'i_gather' : m.kind === 'scout' ? 'i_eye' : 'i_swords';
+      const end = m.phase === 'gathering' ? m.gatherEnd! : m.arriveAt;
+      troops.push(`<button class="troop ${m.kind}" data-march="${m.id}" aria-label="March">${pic}<span class="st">${ink(state as InkIcon, 14)}</span><span class="tt" data-end="${end}"></span></button>`);
+    }
+    if (out.length < slots) troops.push('<button class="troop empty" data-slot="1" aria-label="Send an army"><span>+</span></button>');
+    this.set('troops', troops.join(''));
+
+    // alliance chat, the last few lines
+    const al = s.alliance;
+    this.parts.chat.classList.toggle('hidden', !al || !al.chat.length);
+    if (al) {
+      const who = (f: string) => (f === 'me' ? s.governor : f === 'sys' ? 'Herald' : MEMBER_BY_ID[f]?.name ?? '');
+      this.set(
+        'chat',
+        `<span class="chat-ic">${ink('i_banner', 20)}</span><div class="chat-lines">${al.chat
+          .slice(-3)
+          .map((m) => `<div><b>[${ALLIANCE.tag}]${esc(who(m.from))}:</b> ${esc(m.text)}</div>`)
+          .join('')}</div>`,
+      );
+    }
 
     // queues
     const q: string[] = ['<div class="kicker">Works</div>'];
@@ -175,17 +256,6 @@ export class Hud {
       const ic = j.kind === 'research' ? ink(TECH_BY_ID[j.target].icon, 26) : j.kind === 'heal' ? ink('i_heal', 26) : `<img src="${assetUrl(troopIdSprite(j.target))}" alt="">`;
       q.push(`<div class="queue" data-job="${j.id}">${ic}<div class="q-main"><div class="q-title">${esc(jobTitle(this.ctx, j))}</div><div class="q-bar"><div data-start="${j.start}" data-end="${j.end}"></div></div></div>${this.helpBtn(j)}<span class="q-time" data-end="${j.end}"></span></div>`);
     }
-    if (s.marches.length) q.push('<div class="kicker" style="margin-top:6px">Marches</div>');
-    for (const m of s.marches) {
-      const t = findObj(s, m.targetId);
-      const label = m.phase === 'returning' ? 'Returning' : m.phase === 'gathering' ? 'Gathering' : m.kind === 'scout' ? 'Scouting' : m.kind === 'gather' ? 'To gather' : 'Attacking';
-      const end = m.phase === 'gathering' ? m.gatherEnd! : m.arriveAt;
-      const pic = m.commanderId ? `<img class="portrait" src="${assetUrl(COMMANDER_BY_ID[m.commanderId].portrait)}" alt="">` : ink('i_eye', 26);
-      q.push(`<div class="queue ${m.kind === 'gather' ? 'gather' : m.kind === 'attack' ? 'march' : ''}" data-march="${m.id}">${pic}<div class="q-main"><div class="q-title">${label} · ${esc(t ? objLabel(t) : '')}</div>
-        <div class="q-bar"><div data-start="${m.departAt}" data-end="${end}"></div></div></div><span class="q-time" data-end="${end}"></span></div>`);
-    }
-    const marchCount = s.marches.filter((m) => m.kind !== 'scout').length;
-    q.push(`<div class="kicker" style="color:var(--faint);margin-top:2px">March queues ${marchCount} / ${marchSlots(cityHallLevel(s))}</div>`);
     this.set('queues', q.join(''));
 
     // quest slip
@@ -224,9 +294,10 @@ export class Hud {
     const unread = s.reports.filter((r) => !r.read).length;
     const claimable = activeQuests(s, 8).filter((x) => questDone(s, x)).length;
     const badge = (id: string, n: number) => {
-      const b = this.root.querySelector(`[data-badge=${id}]`) as HTMLElement;
-      b.classList.toggle('hidden', n <= 0);
-      b.textContent = String(n);
+      this.root.querySelectorAll<HTMLElement>(`[data-badge=${id}]`).forEach((b) => {
+        b.classList.toggle('hidden', n <= 0);
+        b.textContent = String(n);
+      });
     };
     badge('mail', unread);
     badge('quests', claimable);
@@ -236,10 +307,7 @@ export class Hud {
     badge('hunt', huntBadge(s));
     badge('alliance', s.alliance ? allianceBadge(s) : 0);
     badge('commanders', Object.values(s.commanders).some((c) => !c.unlocked && c.sculptures >= 10) ? 1 : 0);
-
-    this.root.querySelectorAll('.rail-btn[data-nav=city], .rail-btn[data-nav=world]').forEach((b) => {
-      b.classList.toggle('is-active', (b as HTMLElement).dataset.nav === this.view);
-    });
+    badge('builders', s.builders - s.jobs.filter((j) => j.kind === 'build').length);
     const tic = this.parts.toggle.querySelector('[data-role=tic]') as HTMLElement;
     const tcap = this.parts.toggle.querySelector('[data-role=tcap]') as HTMLElement;
     const want = this.view === 'city' ? ['i_map', 'REALM'] : ['i_castle', 'CITY'];

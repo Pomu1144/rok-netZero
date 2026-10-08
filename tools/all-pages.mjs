@@ -6,7 +6,7 @@
  *
  *   npm run build && node tools/all-pages.mjs        # -> store/pages/NN-name.jpg
  */
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { preview } from 'vite';
 import { enterKingdom, fightBarbarians, seedAndSettle } from './store-scenes.mjs';
@@ -20,8 +20,9 @@ const H = 440;
 
 const server = await preview({ preview: { port: 4325, strictPort: true }, logLevel: 'silent' });
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
-rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
+// old captures go, the gallery page stays
+for (const f of readdirSync(OUT)) if (f.endsWith('.jpg')) rmSync(OUT + f);
 const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 2, hasTouch: true });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
@@ -123,7 +124,6 @@ try {
   await page.evaluate(() => window.__ctx.goCity());
   await page.waitForTimeout(500);
   await fightBarbarians(page);
-  await nav('mail', 'Reports');
   await page.evaluate(() => window.__ctx.openReport(window.__game.state.reports.find((r) => r.kind === 'battle').id));
   await page.waitForTimeout(1000);
   await shot('report', 'Battle report');

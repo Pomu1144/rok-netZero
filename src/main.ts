@@ -371,6 +371,7 @@ const hud = new Hud(ctx, {
     if (id === 'daily') openDaily(ctx);
     if (id === 'honours') openHonours(ctx);
     if (id === 'alliance') openAlliance(ctx);
+    if (id === 'chat') openAlliance(ctx, 'chat');
     if (id === 'hunt') openHunt(ctx);
     if (id === 'campaign') openCampaign(ctx);
   },

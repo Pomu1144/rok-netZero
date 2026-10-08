@@ -110,17 +110,15 @@ export class WorldView {
   }
 
   private legendAt = { x: 12, y: 0, ok: true, at: -1e9 };
-  /** Bottom-left corner clear of the side rail and the world tools (re-measured twice a second). */
+  /** Bottom-left, beside the city/realm ensō and above the world tools (re-measured twice a second). */
   private legendSpot(): { x: number; y: number } | null {
     if (this.time - this.legendAt.at > 500) {
       const box = this.canvas.getBoundingClientRect();
-      const rail = document.querySelector('.rail')?.getBoundingClientRect();
+      const toggle = document.querySelector('#hud .toggle')?.getBoundingClientRect();
       const tools = document.querySelector('.world-tools')?.getBoundingClientRect();
-      const vertical = !!rail && rail.height > rail.width;
-      const x = (vertical && rail ? rail.right : box.left) - box.left + 12;
+      const x = (toggle && toggle.width > 0 ? toggle.right - box.left : 0) + 12;
       let y = box.height - 12;
       if (tools && tools.height > 0) y = Math.min(y, tools.top - box.top - 10);
-      if (rail && !vertical) y = Math.min(y, rail.top - box.top - 10);
       this.legendAt = { x, y, ok: y > 330, at: this.time };
     }
     return this.legendAt.ok ? this.legendAt : null;

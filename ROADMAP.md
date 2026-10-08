@@ -50,6 +50,6 @@ Legend: `[x]` done · `[ ]` to do · **(you)** needs the owner (accounts, signin
 - [ ] Apple Developer Program membership and an App Store Connect app record
 - [ ] Google Play Console account
 - [ ] Signing certificates and provisioning profiles (or a Fastlane match repo)
-- [ ] Final app name check and trademark clearance
+- [ ] Final app name check and trademark clearance (see `store/ip-review.md`: "Realm of Kings" also shortens to "RoK")
 - [ ] Host the privacy policy at a public URL (GitHub Pages works)
 - [ ] Play a TestFlight build on a real iPhone 11 to confirm the frame rate on the device

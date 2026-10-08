@@ -739,6 +739,7 @@ img {
   height: 18px;
 }
 .gov-power .num {
+  white-space: nowrap;
   font-family: var(--cinzel);
   font-weight: 700;
   font-size: 17px;
@@ -1000,6 +1001,35 @@ img {
   clip-path: polygon(50% 0, 100% 18%, 100% 78%, 50% 100%, 0 78%, 0 18%);
   font: 400 22px var(--cinzel);
   color: var(--faint);
+}
+
+.orb.harvest {
+  left: calc(94px + var(--sal));
+  bottom: calc(132px + var(--sab));
+}
+.queue.planned {
+  opacity: 0.85;
+  box-shadow: inset 0 0 0 1px var(--line), inset 2px 0 0 var(--accent);
+  background: linear-gradient(90deg, rgba(36, 32, 26, 0.86), rgba(10, 10, 12, 0.5));
+}
+.plan-note {
+  margin-top: 8px;
+  font-size: 12px;
+  font-style: italic;
+}
+.best-speed {
+  margin-bottom: 10px;
+  box-shadow: inset 0 0 0 1px var(--line-2), inset 2px 0 0 var(--accent);
+}
+.seal-sm {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  background: url('/assets/ink/seal_solid.webp') center / contain no-repeat;
+  font: 900 17px var(--serif);
+  color: #f6e7d4;
 }
 
 /* left: decree slip with a fold-out list of works */
@@ -3379,6 +3409,10 @@ canvas.flow {
     left: calc(22px + var(--sal));
     bottom: calc(96px + var(--sab));
   }
+  .orb.harvest {
+    left: calc(74px + var(--sal));
+    bottom: calc(96px + var(--sab));
+  }
   .orb.mail {
     right: calc(10px + var(--sar));
     bottom: calc(80px + var(--sab));
@@ -3584,6 +3618,10 @@ canvas.flow {
   }
   .orb.build {
     left: calc(20px + var(--sal));
+    bottom: calc(104px + var(--sab));
+  }
+  .orb.harvest {
+    left: calc(76px + var(--sal));
     bottom: calc(104px + var(--sab));
   }
   .orb.mail {

@@ -55,7 +55,7 @@ const STEPS: Step[] = [
   },
   {
     id: 'cityhall',
-    text: 'A greater hall means a greater kingdom. <b>Tap the City Hall</b>, then <b>Upgrade</b>.',
+    text: 'A greater hall means a greater kingdom. <b>Tap the Citadel</b>, then <b>Upgrade</b>.',
     done: (s) => s.buildings.city_hall.level >= 2 || s.jobs.some((j) => j.kind === 'build' && j.target === 'city_hall'),
     target: (_s, h) => {
       if (h.view() !== 'city') return '.toggle';

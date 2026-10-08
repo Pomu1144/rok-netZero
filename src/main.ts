@@ -279,7 +279,7 @@ function renderPopup(): void {
   if (!id) return;
   let html = '';
   if (id === 'home') {
-    html = `<div class="wp-head"><img src="${assetUrl('city_player')}" alt=""><div><div class="wp-title">${esc(s.governor)}'s City</div><div class="wp-sub kicker">${PLAYER_POS.x}, ${PLAYER_POS.y} · City Hall ${cityHallLevel(s)}</div></div></div>
+    html = `<div class="wp-head"><img src="${assetUrl('city_player')}" alt=""><div><div class="wp-title">${esc(s.governor)}'s City</div><div class="wp-sub kicker">${PLAYER_POS.x}, ${PLAYER_POS.y} · Citadel ${cityHallLevel(s)}</div></div></div>
       <div class="wp-body">Garrison of <b>${fmtFull(sumTroops(s.troops))}</b> soldiers stands ready.</div>
       <div class="wp-actions"><button class="btn btn-gold" data-act="enter">${ink('i_castle', 18)} Enter the city</button></div>`;
   } else if (id.startsWith('march:')) {
@@ -299,10 +299,10 @@ function renderPopup(): void {
     let actions = '';
     if (o.kind === 'barbarian') {
       const locked = o.level > maxBarbLevel(s);
-      body = `Warriors <b>${fmtFull(sumTroops(o.troops ?? {}))}</b><br>Yields resources, experience, tomes and sculptures.${locked ? `<br><span style="color:var(--red-2)">Defeat a Lv.${o.level - 1} band first.</span>` : ''}`;
+      body = `Warriors <b>${fmtFull(sumTroops(o.troops ?? {}))}</b><br>Yields resources, experience, tomes and insignia.${locked ? `<br><span style="color:var(--red-2)">Defeat a Lv.${o.level - 1} band first.</span>` : ''}`;
       actions = `<button class="btn btn-red" data-act="attack" ${locked ? 'disabled' : ''}>${ink('i_swords', 16)} Attack · ${ap} AP</button>`;
     } else if (o.kind === 'fort') {
-      body = `A barbarian stronghold.<br>Warriors <b>${fmtFull(sumTroops(o.troops ?? {}))}</b><br>Yields keys, sculptures and tomes.`;
+      body = `A barbarian stronghold.<br>Warriors <b>${fmtFull(sumTroops(o.troops ?? {}))}</b><br>Yields keys, insignia and tomes.`;
       actions = `<button class="btn btn-red" data-act="attack">${ink('i_swords', 16)} Assault · ${ap} AP</button>`;
     } else if (o.kind === 'node') {
       body = `Remaining <b>${fmtFull(o.amount ?? 0)}</b> ${o.res}${o.occupiedBy ? '<br>Your people are gathering here.' : ''}`;
@@ -407,6 +407,15 @@ const hud = new Hud(ctx, {
     else openQuests(ctx);
   },
   raidClick: () => openHospital(ctx),
+  openPlot: (id) => ctx.goCity(id),
+  harvestAll: () => {
+    const s = game.state;
+    const ready = Object.keys(s.buildings).filter((id) => BUILDINGS[s.buildings[id].type].producer && storedAmount(s, id) > 0);
+    if (!ready.length) return toast('The stores are still filling', 'info');
+    if (hud.view !== 'city') ctx.goCity();
+    // one harvest per building, a beat apart, so each pays out in the city
+    ready.forEach((id, i) => setTimeout(() => collectPlot(id), i * 70));
+  },
   profile: () => openProfile(ctx),
   home: () => world.goHome(),
   kingdom: () => {
@@ -632,7 +641,7 @@ function reminders(): Reminder[] {
   }
   for (const m of s.marches) if (m.phase === 'gathering' && m.gatherEnd) out.push({ id: id++, at: real(m.gatherEnd), title: 'Gathering complete', body: 'Your gatherers are heading home.' });
   if (s.raid) out.push({ id: id++, at: real(s.raid.arriveAt) - 60_000, title: 'Barbarians at the gates!', body: 'A warband reaches your walls within the minute.' });
-  if (s.tavern.silverFreeAt > s.time) out.push({ id: id++, at: real(s.tavern.silverFreeAt), title: 'Free chest', body: 'A free Silver Chest awaits in the Tavern.' });
+  if (s.tavern.silverFreeAt > s.time) out.push({ id: id++, at: real(s.tavern.silverFreeAt), title: 'Free chest', body: 'A free Bronze Coffer awaits in the Tavern.' });
   // tomorrow evening: the next login gift
   const eve = new Date();
   eve.setDate(eve.getDate() + 1);

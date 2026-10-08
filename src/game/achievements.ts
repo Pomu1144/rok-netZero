@@ -25,7 +25,7 @@ export const TIER_REWARDS: [Reward, Reward, Reward] = [
 ];
 
 export const ACHIEVEMENTS: AchievementDef[] = [
-  { id: 'a_hall', name: 'Seat of Power', desc: (n) => `Raise the City Hall to Lv.${n}`, value: (s) => s.buildings.city_hall.level, tiers: [5, 12, 20] },
+  { id: 'a_hall', name: 'Seat of Power', desc: (n) => `Raise the Citadel to Lv.${n}`, value: (s) => s.buildings.city_hall.level, tiers: [5, 12, 20] },
   { id: 'a_power', name: 'Rising Crown', desc: (n) => `Reach ${n} power`, value: totalPower, tiers: [50_000, 500_000, 3_000_000] },
   { id: 'a_slayer', name: 'Barbarian Bane', desc: (n) => `Defeat ${n} barbarians`, value: (s) => s.stats.barbsKilled, tiers: [10, 75, 300] },
   { id: 'a_warlord', name: 'Warlord', desc: (n) => `Defeat a Lv.${n} barbarian`, value: (s) => s.stats.maxBarbLevel, tiers: [3, 8, 14] },
@@ -37,7 +37,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'a_holy', name: 'Keeper of Shrines', desc: (n, one) => `Capture ${n} Holy ${one ? 'Site' : 'Sites'}`, value: (s) => s.stats.holyCaptured, tiers: [1, 5, 20] },
   { id: 'a_walls', name: 'Unbroken Walls', desc: (n, one) => `Repel ${n} ${one ? 'raid' : 'raids'} on your city`, value: (s) => s.stats.raidsDefended, tiers: [1, 10, 40] },
   { id: 'a_court', name: 'Court of Legends', desc: (n, one) => `Recruit ${n} ${one ? 'commander' : 'commanders'}`, value: (s) => Object.values(s.commanders).filter((c) => c.unlocked).length, tiers: [3, 5, 6] },
-  { id: 'a_fortune', name: 'Fortune’s Favour', desc: (n, one) => `Open ${n} tavern ${one ? 'chest' : 'chests'}`, value: (s) => s.stats.chestsOpened, tiers: [5, 50, 200] },
+  { id: 'a_fortune', name: 'Fortune’s Favour', desc: (n, one) => `Open ${n} tavern ${one ? 'coffer' : 'coffers'}`, value: (s) => s.stats.chestsOpened, tiers: [5, 50, 200] },
   { id: 'a_loyal', name: 'Loyal Governor', desc: (n) => `Claim ${n} daily gifts`, value: (s) => (s.login ? s.login.cycles * 7 + s.login.claimed : 0), tiers: [7, 30, 100] },
 ];
 

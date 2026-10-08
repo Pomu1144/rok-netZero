@@ -401,7 +401,7 @@ export function openProfile(ctx: UiCtx): void {
           <div class="gov-avatar" style="width:92px;height:92px;background-image:url(${assetUrl('city_player')})"></div>
           <div class="grow kv">
             <span class="k">Power</span><b>${fmtFull(totalPower(s))}</b>
-            <span class="k">City Hall</span><b>Lv.${cityHallLevel(s)}</b>
+            <span class="k">Citadel</span><b>Lv.${cityHallLevel(s)}</b>
             <span class="k">Barbarians slain</span><b>${fmtFull(s.stats.barbsKilled)}</b>
             <span class="k">Troops trained</span><b>${fmtFull(s.stats.troopsTrained)}</b>
             <span class="k">Resources gathered</span><b>${fmtFull(s.stats.gathered)}</b>
@@ -438,9 +438,9 @@ export function openProfile(ctx: UiCtx): void {
 
 const ADVISOR_STEPS = [
   `Welcome, <b>Governor</b>. I am Joan, and I will counsel you. This land is wild and thick with <b>barbarians</b>; with wisdom and steel your city will become a kingdom.`,
-  `<b>Grow your economy.</b> Farms and mills fill their stores over time; tap the floating seal to harvest. Raise the <b>City Hall</b> to unlock new buildings and lift every level cap.`,
+  `<b>Grow your economy.</b> Farms and mills fill their stores over time; tap the floating seal to harvest. Raise the <b>Citadel</b> to unlock new buildings and lift every level cap.`,
   `<b>Raise an army.</b> Infantry break cavalry, cavalry ride down archers, archers shred infantry. Lead them with <b>commanders</b> whose skills strike when their rage is full.`,
-  `<b>Conquer the realm.</b> Open the world map to slay barbarians, gather from rich lands, seize Holy Sites and plunder rival lords. The <b>decree</b> on the right shows your next step.`,
+  `<b>Conquer the realm.</b> Open the world map to slay barbarians, gather from rich lands, seize Shrines and plunder rival lords. The <b>decree</b> on the right shows your next step.`,
 ];
 
 export function openAdvisor(_ctx: UiCtx, onDone: () => void): void {

@@ -7,7 +7,7 @@ import { t } from '../i18n';
 
 /**
  * The kingdom view: far zoomed out, the realm becomes a painted ink map with
- * strategic seals at fixed screen size: your city, rival cities, Holy Sites,
+ * strategic seals at fixed screen size: your city, rival cities, Shrines,
  * forts, barbarian camps, resource fields and marches in motion.
  */
 
@@ -156,7 +156,7 @@ export function drawKingdom(ctx: CanvasRenderingContext2D, cam: Camera, s: GameS
       ctx.fill();
     }
   }
-  // forts, holy sites and rival cities: seals
+  // forts, shrines and rival cities: seals
   for (const o of s.world) {
     if (isHidden(s, o)) continue;
     const p = sc(o.x, o.y);
@@ -216,7 +216,7 @@ export function drawLegend(ctx: CanvasRenderingContext2D, x: number, y: number, 
   const rows: [string, string, string, string][] = [
     ['我', '#c9a24e', '#1d1a14', 'Your city'],
     ['城', '#9a2a22', '#fff3e6', 'Rival city'],
-    ['聖', '#f4ecd6', '#8d6a26', 'Holy Site'],
+    ['聖', '#f4ecd6', '#8d6a26', 'Shrine'],
     ['砦', '#5a1712', '#fff3e6', 'Barbarian fort'],
   ];
   ctx.save();

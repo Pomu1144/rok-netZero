@@ -14,7 +14,7 @@ Raise a city from the wilds, lead six legendary generals and bring every banner 
 Realm of Kings is a kingdom-building strategy game painted in the style of an ink scroll.
 
 BUILD A LIVING CITY
-Raise fifteen kinds of buildings from muddy plots to stone halls. Farms, mills, quarries and mines fill their stores while you plan; tap to harvest. Upgrade your City Hall to unlock new structures, troop tiers and march queues.
+Raise fifteen kinds of buildings from muddy plots to stone halls. Farms, mills, quarries and mines fill their stores while you plan; tap to harvest. Raise your Citadel to unlock new structures, troop tiers and march queues.
 
 COMMAND LEGENDARY GENERALS
 Lead Julius Caesar, Joan of Arc, Sun Tzu, Boudica, Cleopatra and Batu Khan. Level them up, raise their stars and awaken four skills each. In battle their rage builds until their signature skill strikes.
@@ -23,10 +23,10 @@ MASTER THE ART OF WAR
 Train infantry, archers, cavalry and siege engines across five tiers. Infantry breaks cavalry, cavalry rides down archers, archers shred infantry — choose your army wisely.
 
 CONQUER THE REALM
-March across a living world map. Hunt barbarians, storm their forts, gather from rich lands, plunder rival governors and seize Holy Sites for kingdom-wide blessings. Defend your walls when warbands raid your city.
+March across a living world map. Hunt barbarians, storm their strongholds, gather from rich lands, plunder rival governors and seize Shrines for kingdom-wide blessings. Defend your walls when warbands raid your city.
 
 STUDY AND GROW
-Research two technology trees, open Tavern chests, complete twenty-six chronicle decrees and watch your power climb.
+Research two technology trees, open Tavern coffers, complete twenty-six chronicle decrees and watch your power climb.
 
 PLAY ANYWHERE
 Fully offline. No account, no ads, no tracking. Your kingdom keeps growing while you're away.

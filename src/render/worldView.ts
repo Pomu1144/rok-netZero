@@ -451,7 +451,7 @@ export class WorldView {
       text = `Barbarians · ${o.level}`;
     } else if (o.kind === 'fort') {
       accent = 'rgba(217,96,79,0.95)';
-      text = `Fort · ${o.level}`;
+      text = `Stronghold · ${o.level}`;
     } else if (o.kind === 'node') {
       accent = o.occupiedBy ? 'rgba(232,207,140,0.95)' : routeColor('gather');
       text = `${{ food: 'Cropland', wood: 'Timber', stone: 'Stone', gold: 'Gold' }[o.res!]} · ${o.level}`;
@@ -460,7 +460,7 @@ export class WorldView {
       text = o.name ?? 'City';
     } else if (o.kind === 'holy') {
       accent = 'rgba(232,207,140,0.95)';
-      text = o.name ?? 'Holy Site';
+      text = o.name ?? 'Shrine';
     }
     const k = 1 / Math.max(0.6, this.camera.zoom);
     inkLabel(ctx, x, y + size * 0.3, text, k, accent);

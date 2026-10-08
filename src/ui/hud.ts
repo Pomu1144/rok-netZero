@@ -1,10 +1,10 @@
 import { assetUrl } from '../assets';
-import { marchSlots } from '../data/buildings';
+import { BUILDINGS, marchSlots } from '../data/buildings';
 import { COMMANDER_BY_ID } from '../data/commanders';
 import { TECH_BY_ID } from '../data/research';
 import { troopIdSprite } from '../data/troops';
 import { RES_KEYS } from '../data/types';
-import { FREE_FINISH_SECONDS, canAfford, cityHallLevel, totalPower, upgradeInfo } from '../game/logic';
+import { FREE_FINISH_SECONDS, canAfford, cityHallLevel, producerCap, storedAmount, totalPower, upgradeInfo } from '../game/logic';
 import { achievementBadge } from '../game/achievements';
 import { huntBadge } from '../game/hunt';
 import { ALLIANCE, MEMBER_BY_ID, allianceBadge, canAskHelp } from '../game/alliance';
@@ -13,7 +13,7 @@ import { activeQuests, questDone } from '../game/quests';
 import { MAX_AP, type Job } from '../game/state';
 import type { UiCtx } from './ctx';
 import { $, el } from './dom';
-import { esc, fmt } from './format';
+import { esc, fmt, fmtFull } from './format';
 import { ink, type InkIcon } from './ink';
 import { jobTitle } from './panels/city';
 
@@ -26,6 +26,8 @@ export interface HudHandlers {
   idleBuilder: () => void;
   questClick: () => void;
   raidClick: () => void;
+  openPlot: (plotId: string) => void;
+  harvestAll: () => void;
   profile: () => void;
   home: () => void;
   kingdom: () => void;
@@ -46,9 +48,9 @@ const MORE: [string, InkIcon, string][] = [
   ['settings', 'i_gear', 'Court'],
 ];
 
-/** The age a City Hall level belongs to, shown under the resources. */
+/** The age a Citadel level belongs to, shown under the resources. */
 export function ageOf(level: number): string {
-  return level >= 22 ? 'Imperial Age' : level >= 16 ? 'Feudal Age' : level >= 10 ? 'Iron Age' : level >= 5 ? 'Bronze Age' : 'Stone Age';
+  return level >= 22 ? 'Era of Crowns' : level >= 16 ? 'Era of Banners' : level >= 10 ? 'Era of Stone' : level >= 5 ? 'Era of Timber' : 'Era of Thatch';
 }
 
 const FOLD_KEY = 'rok.worksOpen';
@@ -118,6 +120,7 @@ export class Hud {
       </button>`),
     );
     this.root.appendChild(el(`<button class="orb build" data-idle="1" aria-label="Builders">${ink('i_hammer', 30)}<span class="badge hidden" data-badge="builders"></span></button>`));
+    this.root.appendChild(el(`<button class="orb harvest" data-harvest="1" aria-label="Harvest every building">${ink('i_gather', 28)}<span class="badge hidden" data-badge="harvest"></span></button>`));
     add('chat-strip hidden', 'chat');
     add('world-tools', 'worldtools');
     // bottom right: reports above the tray of round buttons
@@ -157,6 +160,9 @@ export class Hud {
       const march = t.closest('[data-march]') as HTMLElement | null;
       if (march) return this.h.openMarchInfo(march.dataset.march!);
       if (t.closest('[data-idle]')) return this.h.idleBuilder();
+      if (t.closest('[data-harvest]')) return this.h.harvestAll();
+      const plan = t.closest('[data-plan]') as HTMLElement | null;
+      if (plan) return this.h.openPlot(plan.dataset.plan!);
       if (t.closest('[data-slot]')) return this.h.openNav('world');
       if (t.closest('[data-part=toggle]')) return this.h.toggleView();
       if (t.closest('[data-part=quest]')) return this.h.questClick();
@@ -200,7 +206,7 @@ export class Hud {
       'gov',
       `<div class="gov-avatar" style="background-image:url(${assetUrl('city_player')})"><img class="ring" src="${assetUrl('ink/ink_enso_gold')}" alt=""><span class="seal">${ch}</span></div>
        <div class="gov-info">
-         <div class="gov-power" title="Power">${ink('i_swords', 18)}<span class="num">${totalPower(s).toLocaleString('en-US')}</span></div>
+         <div class="gov-power" title="Power">${ink('i_swords', 18)}<span class="num">${fmtFull(totalPower(s))}</span></div>
          <div class="gov-sub"><span class="gov-name">${esc(s.governor)}</span><span class="ap" title="Action points">${ink('i_flame', 14)}<span class="gauge ap"><span style="width:${(s.ap / MAX_AP) * 100}%"></span></span><small>${Math.floor(s.ap)}</small></span></div>
        </div>`,
     );
@@ -213,7 +219,7 @@ export class Hud {
         })
         .join(''),
     );
-    this.set('age', `<b>${ageOf(ch)}</b><span>City Hall ${ch}</span>`);
+    this.set('age', `<b>${ageOf(ch)}</b><span>Citadel Lv.${ch}</span>`);
 
     // armies in the field, one portrait per march, then one free slot to send another
     const slots = marchSlots(ch);
@@ -251,6 +257,10 @@ export class Hud {
     }
     for (let i = builds.length; i < s.builders; i++) {
       q.push(`<div class="queue idle" data-idle="1">${ink('i_hammer', 26)}<div class="q-main"><div class="q-title">Builder at rest</div><div class="q-sub">Tap to find work</div></div></div>`);
+    }
+    for (const id of s.buildPlan ?? []) {
+      const b = s.buildings[id];
+      q.push(`<div class="queue planned" data-plan="${id}">${ink('i_scroll', 26)}<div class="q-main"><div class="q-title">Planned · ${esc(BUILDINGS[b.type].name)} Lv.${b.level + 1}</div><div class="q-sub">Starts when a builder is free</div></div></div>`);
     }
     for (const j of s.jobs.filter((x) => x.kind !== 'build')) {
       const ic = j.kind === 'research' ? ink(TECH_BY_ID[j.target].icon, 26) : j.kind === 'heal' ? ink('i_heal', 26) : `<img src="${assetUrl(troopIdSprite(j.target))}" alt="">`;
@@ -308,6 +318,10 @@ export class Hud {
     badge('alliance', s.alliance ? allianceBadge(s) : 0);
     badge('commanders', Object.values(s.commanders).some((c) => !c.unlocked && c.sculptures >= 10) ? 1 : 0);
     badge('builders', s.builders - s.jobs.filter((j) => j.kind === 'build').length);
+    const full = Object.keys(s.buildings).filter((id) => BUILDINGS[s.buildings[id].type].producer && storedAmount(s, id) >= producerCap(s, id) * 0.25).length;
+    badge('harvest', full);
+    this.parts.harvestOrb ??= this.root.querySelector('.orb.harvest') as HTMLElement;
+    this.parts.harvestOrb.classList.toggle('hidden', this.view !== 'city');
     const tic = this.parts.toggle.querySelector('[data-role=tic]') as HTMLElement;
     const tcap = this.parts.toggle.querySelector('[data-role=tcap]') as HTMLElement;
     const want = this.view === 'city' ? ['i_map', 'REALM'] : ['i_castle', 'CITY'];
@@ -321,7 +335,7 @@ export class Hud {
     }
   }
 
-  /** Find a building the player can upgrade right now, preferring the City Hall. */
+  /** Find a building the player can upgrade right now, preferring the Citadel. */
   static suggestUpgrade(ctx: UiCtx): string {
     const s = ctx.game.state;
     const ids = Object.keys(s.buildings)

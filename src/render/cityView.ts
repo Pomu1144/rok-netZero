@@ -42,6 +42,9 @@ const PLAZA: [number, number, number, number] = [10.6, 10.6, 18.4, 18.4];
 const WALL_MIN = 2.2;
 const WALL_MAX = 25.6;
 const GATE: [number, number] = [12.5, 15.7];
+/** Slope of the painted wall segment, and how much taller than painted it stands. */
+const WALL_SLOPE = 0.42;
+const WALL_TALL = 1.75;
 
 /** Buildings that send up chimney smoke, with the chimney position inside their sprite box. */
 const CHIMNEYS: Partial<Record<BuildingType, [number, number]>> = {
@@ -78,7 +81,7 @@ function forestRing(): { gx: number; gy: number; s: number; kind: string }[] {
 function wallSegments(): { a: [number, number]; b: [number, number]; mirror: boolean }[] {
   const segs: { a: [number, number]; b: [number, number]; mirror: boolean }[] = [];
   const run = (fixed: 'gx' | 'gy', at: number, from: number, to: number, mirror: boolean) => {
-    const n = Math.max(1, Math.round((to - from) / 3.9));
+    const n = Math.max(1, Math.round((to - from) / 3.2));
     const step = (to - from) / n;
     for (let i = 0; i < n; i++) {
       const s0 = from + step * i;
@@ -94,6 +97,21 @@ function wallSegments(): { a: [number, number]; b: [number, number]; mirror: boo
   return segs;
 }
 
+const WALL_CORNERS: [number, number][] = [
+  [WALL_MIN, WALL_MIN],
+  [WALL_MAX, WALL_MIN],
+  [WALL_MIN, WALL_MAX],
+  [WALL_MAX, WALL_MAX],
+];
+
+function wallJoins(segs: { a: [number, number]; b: [number, number] }[]): [number, number][] {
+  const near = (p: [number, number], q: [number, number]) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 0.5;
+  const skip: [number, number][] = [...WALL_CORNERS, [GATE[0], WALL_MAX], [GATE[1], WALL_MAX]];
+  const out: [number, number][] = [];
+  for (const sgm of segs) for (const p of [sgm.a, sgm.b]) if (!skip.some((q) => near(p, q)) && !out.some((q) => near(p, q))) out.push(p);
+  return out;
+}
+
 export class CityView {
   camera: Camera;
   fx = new Fx();
@@ -104,6 +122,8 @@ export class CityView {
   private groundKey = '';
   private trees = forestRing();
   private walls = wallSegments();
+  /** Where two runs of wall meet away from the corners and the gate. */
+  private wallJoins = wallJoins(this.walls);
   private walkers: Walker[] = [];
   private mists = Array.from({ length: 7 }, (_, i) => ({ x: i * 620 - 2200, y: -300 + ((i * 433) % 1700), s: 0.9 + ((i * 7) % 5) / 5, v: 0.008 + (i % 3) * 0.004 }));
   private birds = { x: -2600, y: 400, t: 0, next: 4000 };
@@ -304,12 +324,17 @@ export class CityView {
     }
     const tower = img(spriteFor('wall', this.game.state.buildings.wall.level)) ?? img('watchtower');
     if (tower) {
-      for (const [gx, gy] of [[WALL_MIN, WALL_MIN], [WALL_MAX, WALL_MIN], [WALL_MIN, WALL_MAX], [WALL_MAX, WALL_MAX]]) {
+      const put = (gx: number, gy: number, size: number) => {
         const p = isoToWorld(gx, gy);
-        const w = TW * 1.7;
+        const w = TW * size;
         const h = (w * tower.naturalHeight) / tower.naturalWidth;
         items.push({ depth: gx + gy + 0.9, draw: () => ctx.drawImage(tower, p.x - w / 2, p.y - h * 0.82, w, h) });
-      }
+      };
+      // great towers on the corners and either side of the gate, lesser ones at every join
+      for (const [gx, gy] of WALL_CORNERS) put(gx, gy, 1.9);
+      put(GATE[0], WALL_MAX, 1.55);
+      put(GATE[1], WALL_MAX, 1.55);
+      for (const [gx, gy] of this.wallJoins) put(gx, gy, 1.15);
     }
     for (const p of PLOTS) items.push({ depth: p.gx + p.gy + BUILDINGS[p.type].size * 2 - 0.5, draw: () => this.drawPlot(ctx, p) });
     for (const v of this.walkers) {
@@ -421,22 +446,28 @@ export class CityView {
     return this.shadows;
   }
 
+  /**
+   * One run of rampart. The painted segment leans a little shallower than the
+   * iso grid and is far longer than it is tall, so it is drawn taller (a thick,
+   * high wall), then sheared back onto the grid's 2:1 slope so runs meet cleanly.
+   */
   private drawWallSeg(ctx: CanvasRenderingContext2D, seg: { a: [number, number]; b: [number, number]; mirror: boolean }): void {
     const im = img('ink/wall_seg');
     if (!im) return;
     const A = isoToWorld(...seg.a);
     const B = isoToWorld(...seg.b);
     const dx = Math.abs(B.x - A.x);
-    const midX = (A.x + B.x) / 2;
-    const midY = (A.y + B.y) / 2;
-    const w = dx * 1.08;
-    const s = w / im.naturalWidth;
-    const h = im.naturalHeight * s;
+    const w = dx * 1.06;
+    const sx = w / im.naturalWidth;
+    const sy = sx * WALL_TALL;
     ctx.save();
-    ctx.translate(midX, midY);
+    ctx.translate((A.x + B.x) / 2, (A.y + B.y) / 2);
     if (seg.mirror) ctx.scale(-1, 1);
+    // shear so the stretched sprite still runs at the grid's slope of one half
+    ctx.transform(1, 0.5 - WALL_SLOPE * WALL_TALL, 0, 1, 0, 0);
+    ctx.scale(sx, sy);
     // the sprite's base line passes ~63% down its height at the middle
-    ctx.drawImage(im, -w / 2, -h * 0.63, w, h);
+    ctx.drawImage(im, -im.naturalWidth / 2, -im.naturalHeight * 0.63);
     ctx.restore();
   }
 

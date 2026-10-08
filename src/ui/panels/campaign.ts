@@ -11,7 +11,7 @@ import { sumTroops } from '../../game/state';
 import { playBattle } from '../battleScene';
 import type { UiCtx } from '../ctx';
 import { onAct, openModal, rewardHtml, toast } from '../dom';
-import { esc, fmt } from '../format';
+import { esc, fmt, fmtFull } from '../format';
 import { ink } from '../ink';
 
 const starRow = (n: number) => `<span class="cp-stars">${[0, 1, 2].map((i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('')}</span>`;
@@ -66,7 +66,7 @@ export function openCampaign(ctx: UiCtx): void {
             <div class="cp-army">${Object.entries(stage.enemy.troops)
               .map(([id, n]) => `<span class="cp-unit"><img src="${assetUrl(stage.enemy.barbarian ? 'unit_barbarian' : troopIdSprite(id))}" alt="">${fmt(n)}<small>${TROOP_NAMES[id.split('_')[0] as TroopType][Number(id.split('_')[1]) - 1]}</small></span>`)
               .join('')}</div>
-            <div class="cp-power"><div><span class="kicker">Enemy power</span><b class="num">${fmt(theirs)}</b></div><div><span class="kicker">Your army</span><b class="num">${fmt(mine)}</b></div><div class="cp-odds ${odds[1]}">${odds[0]}</div></div>
+            <div class="cp-power"><div><span class="kicker">Enemy power</span><b class="num">${fmtFull(theirs)}</b></div><div><span class="kicker">Your army</span><b class="num">${fmtFull(mine)}</b></div><div class="cp-odds ${odds[1]}">${odds[0]}</div></div>
             <div>${best ? '<span class="kicker">Cleared · replay for more stars and commander experience</span>' : `<span class="kicker">First victory</span>${rewardHtml(stage.reward)}`}</div>
           </div>
         </div>
